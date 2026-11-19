@@ -57,6 +57,18 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: gradle -p padmd-android assembleRelease --no-daemon
 
+      # Second build with the older Android toolset (AGP 7.4) as a fallback for Android 5 tablets
+      - name: Build classic APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          rm -rf /tmp/classic && cp -r padmd-android /tmp/classic
+          sed -i "s/version '8.5.2'/version '7.4.2'/" /tmp/classic/build.gradle
+          sed -i "s/compileSdk 34/compileSdk 33/; s/targetSdk 34/targetSdk 33/; s/JavaVersion.VERSION_17/JavaVersion.VERSION_11/g" /tmp/classic/app/build.gradle
+          gradle wrapper -p /tmp/classic --gradle-version 7.6.4 --no-daemon || true
+          (cd /tmp/classic && ./gradlew assembleRelease --no-daemon)
+          cp /tmp/classic/app/build/outputs/apk/release/app-release.apk padMD-classic.apk
+
       - name: Publish to the padMD release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,10 +78,12 @@ jobs:
             gh release create padmd-latest --target "$GITHUB_SHA" --title "padMD Android app" \
               --notes "Download padMD.apk on your tablet and open it to install. Built automatically from the padmd-android folder." --prerelease
           fi
-          gh release upload padmd-latest padMD.apk --clobber
+          gh release upload padmd-latest padMD.apk padMD-classic.apk --clobber
           gh release edit padmd-latest --notes "Download padMD.apk on your tablet and open it to install. Version 1.0.${{ github.run_number }}, built $(date -u +%Y-%m-%d)."
 
       - uses: actions/upload-artifact@v4
         with:
           name: padMD-apk
-          path: padMD.apk
+          path: |
+            padMD.apk
+            padMD-classic.apk

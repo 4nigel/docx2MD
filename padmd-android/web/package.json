@@ -1,0 +1,7 @@
+{
+  "name": "padmd-web-build",
+  "private": true,
+  "description": "Turns padMD.src.html into the older-browser-friendly padMD.html used by the app",
+  "scripts": { "build": "node build.js padMD.src.html ../app/src/main/assets/padMD.html" },
+  "devDependencies": { "@babel/core": "7.26.0", "@babel/preset-env": "7.26.0" }
+}

@@ -38,7 +38,7 @@
 html,body{height:100%}
 body{
   font-family:var(--sans);font-size:15px;background:var(--bg);color:var(--text);
-  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  display:flex;flex-direction:column;height:100%;height:100dvh;overflow:hidden;
   -webkit-tap-highlight-color:transparent;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
@@ -47,9 +47,10 @@ svg{display:block}
 
 /* ── Header ── */
 header{
-  display:flex;align-items:center;gap:6px;padding:0 8px;min-height:56px;
+  display:flex;align-items:center;padding:0 8px;min-height:56px;
   background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
 }
+.hbtn,.seg{margin-left:4px}
 .logo{width:34px;height:34px;border:2px solid var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;
   font-weight:700;font-size:12px;color:var(--accent);letter-spacing:.02em;flex-shrink:0;margin:0 4px}
 .docname{display:flex;align-items:center;gap:6px;min-width:0;flex:1;padding:6px 8px;border-radius:8px}
@@ -68,11 +69,12 @@ header{
 
 /* ── Format bar ── */
 .fmtbar{
-  display:flex;gap:4px;padding:6px 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+  display:flex;padding:6px 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
   background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
 }
 .fmtbar::-webkit-scrollbar{display:none}
 .fmtbar.hide{display:none}
+.fmtbar>*{margin-right:4px}
 .fb{min-width:var(--tap);height:var(--tap);padding:0 10px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);
   display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap;flex-shrink:0}
 .fb:active{border-color:var(--accent);color:var(--accent);background:var(--accent-lo)}
@@ -134,7 +136,7 @@ body.serif .md{font-family:var(--serif)}
 .md table{border-collapse:collapse;min-width:50%;font-size:.93em;margin:0}
 .md th,.md td{border:1px solid var(--border2);padding:.45em .75em;vertical-align:top}
 .md th{background:var(--surface2);font-family:var(--sans);font-weight:600}
-.md tr:nth-child(even) td{background:color-mix(in srgb,var(--surface2) 45%,transparent)}
+.md tr:nth-child(even) td{background:var(--surface2);background:color-mix(in srgb,var(--surface2) 45%,transparent)}
 .empty{color:var(--text-dim);text-align:center;padding:12vh 20px;font-family:var(--sans)}
 .empty h2{border:none;color:var(--text);font-size:1.4em;margin-bottom:.5em}
 .empty .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:1.4em}
@@ -148,10 +150,10 @@ footer .sp{flex:1}
 #status.ok{color:var(--ok)}#status.warn{color:var(--warn)}
 
 /* ── Sheets (menus and dialogs) ── */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:50}
+.scrim{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.45);display:none;z-index:50}
 .scrim.on{display:block}
 .sheet{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.4);
-  display:none;flex-direction:column;max-height:80dvh;overflow-y:auto}
+  display:none;flex-direction:column;max-height:80vh;max-height:80dvh;overflow-y:auto}
 .sheet.on{display:flex}
 .menu{top:60px;right:8px;width:290px;padding:6px}
 .menu button,.toc a{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 14px;border-radius:9px;text-align:left;width:100%;font-size:15px}
@@ -304,663 +306,2086 @@ footer .sp{flex:1}
 <div class="toast" id="toast"></div>
 
 <script>
+/* Small fill-ins so older Android browsers (Android 5 and up) can run padMD */
+(function(){
+  if(window.Symbol&&Symbol.iterator){[window.NodeList,window.HTMLCollection].forEach(function(C){if(C&&!C.prototype[Symbol.iterator])C.prototype[Symbol.iterator]=Array.prototype[Symbol.iterator];});}
+  if(window.NodeList&&!NodeList.prototype.forEach)NodeList.prototype.forEach=Array.prototype.forEach;
+  var E=Element.prototype;
+  if(!E.toggleAttribute)E.toggleAttribute=function(n,f){if(f===undefined)f=!this.hasAttribute(n);if(f)this.setAttribute(n,'');else this.removeAttribute(n);return f;};
+  if(!E.replaceWith)E.replaceWith=function(){var p=this.parentNode,a=Array.prototype.slice.call(arguments),i;if(!p)return;for(i=0;i<a.length;i++)p.insertBefore(typeof a[i]==='string'?document.createTextNode(a[i]):a[i],this);p.removeChild(this);};
+  if(!E.closest)E.closest=function(sel){var n=this;while(n&&n.nodeType===1){if(n.matches?n.matches(sel):n.webkitMatchesSelector(sel))return n;n=n.parentNode;}return null;};
+})();
+</script>
+<script>
 'use strict';
-/* ════════════════════════════════════════════════════════════
-   Markdown renderer (built in, no internet needed)
-   Handles: headings, paragraphs, bold/italic/strike/highlight,
-   links, images, code, quotes, nested and numbered lists,
-   checklists, tables, dividing lines and simple HTML.
-   ════════════════════════════════════════════════════════════ */
-const MD=(()=>{
-  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const safeUrl=u=>{u=u.trim().replace(/^<|>$/g,'');return /^\s*(javascript|vbscript|data:text\/html)/i.test(u)?'#':u;};
-  const slug=t=>t.toLowerCase().replace(/<[^>]+>/g,'').replace(/&[a-z#0-9]+;/g,'').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'section';
-  let toc=[],slugs={},taskN=0;
-
-  function inline(t){
-    const store=[];const put=h=>'\u0001'+(store.push(h)-1)+'\u0002';
-    t=t.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g,(_,f,c)=>put('<code>'+esc(c.replace(/^ (.*) $/,'$1'))+'</code>'));
-    t=t.replace(/\\([\\`*_{}\[\]()#+\-.!|~=>])/g,(_,c)=>put(esc(c)));
-    t=t.replace(/<(https?:\/\/[^>\s]+)>/g,(_,u)=>put(`<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(u)}</a>`));
-    t=t.replace(/!\[([^\]]*)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g,(_,a,s,ti)=>
-      put(`<img src="${esc(safeUrl(s))}" alt="${esc(a)}"${ti?` title="${esc(ti)}"`:''} loading="lazy">`));
-    t=t.replace(/\[([^\]]+)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g,(_,l,h,ti)=>
-      put(`<a href="${esc(safeUrl(h))}"${ti?` title="${esc(ti)}"`:''}${/^#/.test(h)?'':' target="_blank" rel="noopener"'}>`)+l+put('</a>'));
-    t=esc(t);
-    t=t.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g,(_,p,u)=>p+put(`<a href="${u}" target="_blank" rel="noopener">${u}</a>`));
-    t=t.replace(/\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/g,'<strong><em>$1</em></strong>')
-       .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g,'<strong>$1</strong>')
-       .replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__(?!\w)/g,'$1<strong>$2</strong>')
-       .replace(/\*(?=[^\s*])([\s\S]*?[^\s*])\*/g,'<em>$1</em>')
-       .replace(/(^|[^\w])_(?=[^\s_])([\s\S]*?[^\s_])_(?!\w)/g,'$1<em>$2</em>')
-       .replace(/~~(?=\S)([\s\S]*?\S)~~/g,'<del>$1</del>')
-       .replace(/==(?=\S)([\s\S]*?\S)==/g,'<mark>$1</mark>')
-       .replace(/( {2,}|\\)\n/g,'<br>\n');
-    for(let k=0;k<4&&/\u0001\d+\u0002/.test(t);k++)t=t.replace(/\u0001(\d+)\u0002/g,(_,n)=>store[n]);
+function _regenerator() { var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? (c > 1 && (G.n = c < 3 ? -1 : u), d(c, u)) : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
+function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
+function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n2 = 0, F = function F() {}; return { s: F, n: function n() { return _n2 >= r.length ? { done: !0 } : { done: !1, value: r[_n2++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+var MD = (() => {
+  var esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  var safeUrl = u => {
+    u = u.trim().replace(/^<|>$/g, '');
+    return /^\s*(javascript|vbscript|data:text\/html)/i.test(u) ? '#' : u;
+  };
+  var slug = t => t.toLowerCase().replace(/<[^>]+>/g, '').replace(/&[a-z#0-9]+;/g, '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'section';
+  var toc = [],
+    slugs = {},
+    taskN = 0;
+  function inline(t) {
+    var store = [];
+    var put = h => '\u0001' + (store.push(h) - 1) + '\u0002';
+    t = t.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, f, c) => put('<code>' + esc(c.replace(/^ (.*) $/, '$1')) + '</code>'));
+    t = t.replace(/\\([\\`*_{}\[\]()#+\-.!|~=>])/g, (_, c) => put(esc(c)));
+    t = t.replace(/<(https?:\/\/[^>\s]+)>/g, (_, u) => put(`<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(u)}</a>`));
+    t = t.replace(/!\[([^\]]*)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g, (_, a, s, ti) => put(`<img src="${esc(safeUrl(s))}" alt="${esc(a)}"${ti ? ` title="${esc(ti)}"` : ''} loading="lazy">`));
+    t = t.replace(/\[([^\]]+)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g, (_, l, h, ti) => put(`<a href="${esc(safeUrl(h))}"${ti ? ` title="${esc(ti)}"` : ''}${/^#/.test(h) ? '' : ' target="_blank" rel="noopener"'}>`) + l + put('</a>'));
+    t = esc(t);
+    t = t.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g, (_, p, u) => p + put(`<a href="${u}" target="_blank" rel="noopener">${u}</a>`));
+    t = t.replace(/\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/g, '<strong><em>$1</em></strong>').replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>').replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__(?!\w)/g, '$1<strong>$2</strong>').replace(/\*(?=[^\s*])([\s\S]*?[^\s*])\*/g, '<em>$1</em>').replace(/(^|[^\w])_(?=[^\s_])([\s\S]*?[^\s_])_(?!\w)/g, '$1<em>$2</em>').replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<del>$1</del>').replace(/==(?=\S)([\s\S]*?\S)==/g, '<mark>$1</mark>').replace(/( {2,}|\\)\n/g, '<br>\n');
+    for (var k = 0; k < 4 && /\u0001\d+\u0002/.test(t); k++) t = t.replace(/\u0001(\d+)\u0002/g, (_, n) => store[n]);
     return t;
   }
-
-  const reFence=/^ {0,3}(`{3,}|~{3,})(.*)$/, reHead=/^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$/,
-        reHr=/^ {0,3}([-*_])(\s*\1){2,}\s*$/, reQuote=/^ {0,3}>\s?/,
-        reLi=/^( *)([-*+]|\d{1,9}[.)])\s+(.*)$/, reLiEmpty=/^( *)([-*+]|\d{1,9}[.)])\s*$/,
-        reHtml=/^ {0,3}<\/?(div|p|table|thead|tbody|tr|td|th|ul|ol|li|h[1-6]|pre|blockquote|details|summary|figure|figcaption|section|article|aside|header|footer|nav|hr|br|img|center|dl|dt|dd|!--)/i,
-        reTblSep=/^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
-  const indentOf=l=>l.match(/^ */)[0].length;
-  const cleanHtml=h=>h.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,'').replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi,'$1="#"');
-  const cells=r=>{r=r.trim().replace(/^\|/,'').replace(/\|$/,'');const out=[];let cur='',code=false;
-    for(let i=0;i<r.length;i++){const c=r[i];if(c==='\\'&&r[i+1]==='|'){cur+='|';i++;continue;}if(c==='`')code=!code;if(c==='|'&&!code){out.push(cur.trim());cur='';continue;}cur+=c;}
-    out.push(cur.trim());return out;};
-
-  function blocks(src){
-    const L=src.split('\n'),out=[];let i=0;
-    const interrupts=l=>reFence.test(l)||reHead.test(l)||reHr.test(l)||reQuote.test(l)||reLi.test(l)&&indentOf(l)<4||reHtml.test(l);
-    while(i<L.length){
-      const l=L[i];
-      if(!l.trim()){i++;continue;}
-      let m;
-      if(m=l.match(reFence)){
-        const f=m[1],lang=m[2].trim().split(/\s/)[0];i++;const c=[];
-        while(i<L.length&&!new RegExp('^ {0,3}'+f[0]+'{'+f.length+',}\\s*$').test(L[i])){c.push(L[i]);i++;}i++;
-        out.push(`<pre><code${lang?` class="lang-${esc(lang)}"`:''}>${esc(c.join('\n'))}</code></pre>`);continue;
+  var reFence = /^ {0,3}(`{3,}|~{3,})(.*)$/,
+    reHead = /^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$/,
+    reHr = /^ {0,3}([-*_])(\s*\1){2,}\s*$/,
+    reQuote = /^ {0,3}>\s?/,
+    reLi = /^( *)([-*+]|\d{1,9}[.)])\s+(.*)$/,
+    reLiEmpty = /^( *)([-*+]|\d{1,9}[.)])\s*$/,
+    reHtml = /^ {0,3}<\/?(div|p|table|thead|tbody|tr|td|th|ul|ol|li|h[1-6]|pre|blockquote|details|summary|figure|figcaption|section|article|aside|header|footer|nav|hr|br|img|center|dl|dt|dd|!--)/i,
+    reTblSep = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
+  var indentOf = l => l.match(/^ */)[0].length;
+  var cleanHtml = h => h.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+  var cells = r => {
+    r = r.trim().replace(/^\|/, '').replace(/\|$/, '');
+    var out = [];
+    var cur = '',
+      code = false;
+    for (var i = 0; i < r.length; i++) {
+      var c = r[i];
+      if (c === '\\' && r[i + 1] === '|') {
+        cur += '|';
+        i++;
+        continue;
       }
-      if(indentOf(l)>=4){const c=[];while(i<L.length&&(indentOf(L[i])>=4||!L[i].trim())){c.push(L[i].slice(4));i++;}
-        while(c.length&&!c[c.length-1].trim())c.pop();out.push(`<pre><code>${esc(c.join('\n'))}</code></pre>`);continue;}
-      if((m=l.match(reHead))&&!reHr.test(l)){
-        const n=m[1].length,txt=inline(m[2]||'');let id=slug(txt);if(slugs[id]!=null)id+='-'+(++slugs[id]);else slugs[id]=0;
-        toc.push({n,id,text:txt.replace(/<[^>]+>/g,'')});out.push(`<h${n} id="${id}">${txt}</h${n}>`);i++;continue;
+      if (c === '`') code = !code;
+      if (c === '|' && !code) {
+        out.push(cur.trim());
+        cur = '';
+        continue;
       }
-      if(reHr.test(l)){out.push('<hr>');i++;continue;}
-      if(reQuote.test(l)){const q=[];while(i<L.length&&L[i].trim()&&(reQuote.test(L[i])||!interrupts(L[i]))){q.push(L[i].replace(reQuote,''));i++;}
-        out.push('<blockquote>'+blocks(q.join('\n'))+'</blockquote>');continue;}
-      if(reHtml.test(l)){const h=[];while(i<L.length&&L[i].trim()){h.push(L[i]);i++;}out.push(cleanHtml(h.join('\n')));continue;}
-      if(/\|/.test(l)&&i+1<L.length&&reTblSep.test(L[i+1])&&/\|/.test(L[i+1])){
-        const hd=cells(l),al=cells(L[i+1]).map(c=>/^:-+:$/.test(c)?'center':/-+:$/.test(c)?'right':'');
-        const td=(tag,c,k)=>`<${tag}${al[k]?` style="text-align:${al[k]}"`:''}>${inline(c)}</${tag}>`;
-        let h='<div class="tblwrap"><table><thead><tr>'+hd.map((c,k)=>td('th',c,k)).join('')+'</tr></thead><tbody>';i+=2;
-        while(i<L.length&&L[i].trim()&&/\|/.test(L[i])){const r=cells(L[i]);h+='<tr>'+hd.map((_,k)=>td('td',r[k]??'',k)).join('')+'</tr>';i++;}
-        out.push(h+'</tbody></table></div>');continue;
-      }
-      if((reLi.test(l)||reLiEmpty.test(l))&&indentOf(l)<4){
-        const base=indentOf(l),blk=[];
-        while(i<L.length){const x=L[i];
-          if(!x.trim()){let j=i+1;while(j<L.length&&!L[j].trim())j++;
-            if(j<L.length&&(indentOf(L[j])>base||((reLi.test(L[j])||reLiEmpty.test(L[j]))&&indentOf(L[j])>=base))){blk.push('');i++;continue;}break;}
-          if(indentOf(x)<base)break;
-          if(indentOf(x)===base&&!reLi.test(x)&&!reLiEmpty.test(x)&&blk.length&&interrupts(x))break;
-          if(indentOf(x)===base&&!reLi.test(x)&&!reLiEmpty.test(x)&&blk.length&&!blk[blk.length-1])break;
-          blk.push(x);i++;}
-        out.push(list(blk,base));continue;
-      }
-      const p=[];while(i<L.length&&L[i].trim()&&!(p.length&&interrupts(L[i]))){
-        if(i+1<L.length&&/\|/.test(L[i])&&reTblSep.test(L[i+1])&&/\|/.test(L[i+1])&&p.length)break;
-        p.push(L[i].replace(/^ +/,''));i++;}
-      out.push('<p>'+inline(p.join('\n'))+'</p>');
+      cur += c;
+    }
+    out.push(cur.trim());
+    return out;
+  };
+  function blocks(src) {
+    var L = src.split('\n'),
+      out = [];
+    var i = 0;
+    var interrupts = l => reFence.test(l) || reHead.test(l) || reHr.test(l) || reQuote.test(l) || reLi.test(l) && indentOf(l) < 4 || reHtml.test(l);
+    var _loop = function _loop() {
+        var l = L[i];
+        if (!l.trim()) {
+          i++;
+          return 0;
+        }
+        var m;
+        if (m = l.match(reFence)) {
+          var f = m[1],
+            lang = m[2].trim().split(/\s/)[0];
+          i++;
+          var c = [];
+          while (i < L.length && !new RegExp('^ {0,3}' + f[0] + '{' + f.length + ',}\\s*$').test(L[i])) {
+            c.push(L[i]);
+            i++;
+          }
+          i++;
+          out.push(`<pre><code${lang ? ` class="lang-${esc(lang)}"` : ''}>${esc(c.join('\n'))}</code></pre>`);
+          return 0;
+        }
+        if (indentOf(l) >= 4) {
+          var _c = [];
+          while (i < L.length && (indentOf(L[i]) >= 4 || !L[i].trim())) {
+            _c.push(L[i].slice(4));
+            i++;
+          }
+          while (_c.length && !_c[_c.length - 1].trim()) _c.pop();
+          out.push(`<pre><code>${esc(_c.join('\n'))}</code></pre>`);
+          return 0;
+        }
+        if ((m = l.match(reHead)) && !reHr.test(l)) {
+          var n = m[1].length,
+            txt = inline(m[2] || '');
+          var id = slug(txt);
+          if (slugs[id] != null) id += '-' + ++slugs[id];else slugs[id] = 0;
+          toc.push({
+            n,
+            id,
+            text: txt.replace(/<[^>]+>/g, '')
+          });
+          out.push(`<h${n} id="${id}">${txt}</h${n}>`);
+          i++;
+          return 0;
+        }
+        if (reHr.test(l)) {
+          out.push('<hr>');
+          i++;
+          return 0;
+        }
+        if (reQuote.test(l)) {
+          var q = [];
+          while (i < L.length && L[i].trim() && (reQuote.test(L[i]) || !interrupts(L[i]))) {
+            q.push(L[i].replace(reQuote, ''));
+            i++;
+          }
+          out.push('<blockquote>' + blocks(q.join('\n')) + '</blockquote>');
+          return 0;
+        }
+        if (reHtml.test(l)) {
+          var h = [];
+          while (i < L.length && L[i].trim()) {
+            h.push(L[i]);
+            i++;
+          }
+          out.push(cleanHtml(h.join('\n')));
+          return 0;
+        }
+        if (/\|/.test(l) && i + 1 < L.length && reTblSep.test(L[i + 1]) && /\|/.test(L[i + 1])) {
+          var hd = cells(l),
+            al = cells(L[i + 1]).map(c => /^:-+:$/.test(c) ? 'center' : /-+:$/.test(c) ? 'right' : '');
+          var td = (tag, c, k) => `<${tag}${al[k] ? ` style="text-align:${al[k]}"` : ''}>${inline(c)}</${tag}>`;
+          var _h = '<div class="tblwrap"><table><thead><tr>' + hd.map((c, k) => td('th', c, k)).join('') + '</tr></thead><tbody>';
+          i += 2;
+          var _loop2 = function _loop2() {
+            var r = cells(L[i]);
+            _h += '<tr>' + hd.map((_, k) => {
+              var _r$k;
+              return td('td', (_r$k = r[k]) !== null && _r$k !== void 0 ? _r$k : '', k);
+            }).join('') + '</tr>';
+            i++;
+          };
+          while (i < L.length && L[i].trim() && /\|/.test(L[i])) {
+            _loop2();
+          }
+          out.push(_h + '</tbody></table></div>');
+          return 0;
+        }
+        if ((reLi.test(l) || reLiEmpty.test(l)) && indentOf(l) < 4) {
+          var base = indentOf(l),
+            _blk = [];
+          while (i < L.length) {
+            var x = L[i];
+            if (!x.trim()) {
+              var j = i + 1;
+              while (j < L.length && !L[j].trim()) j++;
+              if (j < L.length && (indentOf(L[j]) > base || (reLi.test(L[j]) || reLiEmpty.test(L[j])) && indentOf(L[j]) >= base)) {
+                _blk.push('');
+                i++;
+                continue;
+              }
+              break;
+            }
+            if (indentOf(x) < base) break;
+            if (indentOf(x) === base && !reLi.test(x) && !reLiEmpty.test(x) && _blk.length && interrupts(x)) break;
+            if (indentOf(x) === base && !reLi.test(x) && !reLiEmpty.test(x) && _blk.length && !_blk[_blk.length - 1]) break;
+            _blk.push(x);
+            i++;
+          }
+          out.push(list(_blk, base));
+          return 0;
+        }
+        var p = [];
+        while (i < L.length && L[i].trim() && !(p.length && interrupts(L[i]))) {
+          if (i + 1 < L.length && /\|/.test(L[i]) && reTblSep.test(L[i + 1]) && /\|/.test(L[i + 1]) && p.length) break;
+          p.push(L[i].replace(/^ +/, ''));
+          i++;
+        }
+        out.push('<p>' + inline(p.join('\n')) + '</p>');
+      },
+      _ret;
+    while (i < L.length) {
+      _ret = _loop();
+      if (_ret === 0) continue;
     }
     return out.join('\n');
   }
-
-  function list(lines,base){
-    let html='',open=null,items=[],cur=null;
-    const close=()=>{if(!open)return;html+=`<${open.tag}${open.start&&open.start!==1?` start="${open.start}"`:''}>`+items.map(renderItem).join('')+`</${open.tag}>`;items=[];open=null;};
-    for(const x of lines){
-      const m=x.match(reLi)||x.match(reLiEmpty);
-      if(m&&m[1].length>=base&&m[1].length<base+2){
-        const ord=/\d/.test(m[2]),tag=ord?'ol':'ul';
-        if(open&&open.tag!==tag)close();
-        if(!open)open={tag,start:ord?parseInt(m[2]):null};
-        cur={first:m[3]||'',rest:[],pad:m[1].length+m[2].length+1,loose:false};items.push(cur);
-      }else if(cur){cur.rest.push(x);}
-    }
-    close();return html;
-    function renderItem(it){
-      let t=it.first,cls='',pre='';
-      const tm=t.match(/^\[([ xX])\]\s+(.*)$/)||t.match(/^\[([ xX])\]$/);
-      if(tm){const on=tm[1]!==' ';cls=' class="task'+(on?' done':'')+'"';pre=`<input type="checkbox" data-task="${taskN++}"${on?' checked':''}>`;t=tm[2]||'';}
-      const rest=it.rest.map(r=>r.slice(Math.min(indentOf(r),it.pad))).join('\n').replace(/\n+$/,'');
-      let body='';
-      if(rest.trim()){
-        const firstNested=/^\s*([-*+]|\d+[.)])\s/.test(rest.split('\n').find(s=>s.trim())||'');
-        body=blocks(rest);
-        if(!firstNested&&!/^\s*$/.test(rest.split('\n')[0]))body=body.replace(/^<p>([\s\S]*?)<\/p>/,(_,c)=>'<br>'+c);
+  function list(lines, base) {
+    var html = '',
+      open = null,
+      items = [],
+      cur = null;
+    var close = () => {
+      if (!open) return;
+      html += `<${open.tag}${open.start && open.start !== 1 ? ` start="${open.start}"` : ''}>` + items.map(renderItem).join('') + `</${open.tag}>`;
+      items = [];
+      open = null;
+    };
+    var _iterator = _createForOfIteratorHelper(lines),
+      _step;
+    try {
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        var x = _step.value;
+        var m = x.match(reLi) || x.match(reLiEmpty);
+        if (m && m[1].length >= base && m[1].length < base + 2) {
+          var ord = /\d/.test(m[2]),
+            tag = ord ? 'ol' : 'ul';
+          if (open && open.tag !== tag) close();
+          if (!open) open = {
+            tag,
+            start: ord ? parseInt(m[2]) : null
+          };
+          cur = {
+            first: m[3] || '',
+            rest: [],
+            pad: m[1].length + m[2].length + 1,
+            loose: false
+          };
+          items.push(cur);
+        } else if (cur) {
+          cur.rest.push(x);
+        }
       }
-      return `<li${cls}>${pre}${tm?'<span class="tt">'+inline(t)+'</span>':inline(t)}${body}</li>`;
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
+    }
+    close();
+    return html;
+    function renderItem(it) {
+      var t = it.first,
+        cls = '',
+        pre = '';
+      var tm = t.match(/^\[([ xX])\]\s+(.*)$/) || t.match(/^\[([ xX])\]$/);
+      if (tm) {
+        var on = tm[1] !== ' ';
+        cls = ' class="task' + (on ? ' done' : '') + '"';
+        pre = `<input type="checkbox" data-task="${taskN++}"${on ? ' checked' : ''}>`;
+        t = tm[2] || '';
+      }
+      var rest = it.rest.map(r => r.slice(Math.min(indentOf(r), it.pad))).join('\n').replace(/\n+$/, '');
+      var body = '';
+      if (rest.trim()) {
+        var firstNested = /^\s*([-*+]|\d+[.)])\s/.test(rest.split('\n').find(s => s.trim()) || '');
+        body = blocks(rest);
+        if (!firstNested && !/^\s*$/.test(rest.split('\n')[0])) body = body.replace(/^<p>([\s\S]*?)<\/p>/, (_, c) => '<br>' + c);
+      }
+      return `<li${cls}>${pre}${tm ? '<span class="tt">' + inline(t) + '</span>' : inline(t)}${body}</li>`;
     }
   }
-
-  return{render(src){toc=[];slugs={};taskN=0;const html=blocks(src.replace(/\r\n?/g,'\n').replace(/\t/g,'    '));return{html,toc:toc.slice()};},inline};
+  return {
+    render(src) {
+      toc = [];
+      slugs = {};
+      taskN = 0;
+      var html = blocks(src.replace(/\r\n?/g, '\n').replace(/\t/g, '    '));
+      return {
+        html,
+        toc: toc.slice()
+      };
+    },
+    inline
+  };
 })();
-
-/* ════════════════════════════════════════════════════════════
-   App state and helpers
-   ════════════════════════════════════════════════════════════ */
-const $=id=>document.getElementById(id);
-const src=$('src'),out=$('out'),main=$('main'),editPane=$('editPane'),readPane=$('readPane'),fmtbar=$('fmtbar');
-const KEY='padmd.v1';
-const st={name:'Untitled.md',dirty:false,handle:null,uri:null,view:null,theme:'auto',fs:17,font:'sans',efont:'mono',savedAt:null};
-let lastToc=[];
-
-function loadState(){
-  try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');Object.assign(st,{theme:s.theme||'auto',fs:s.fs||17,font:s.font||'sans',efont:s.efont||'mono',view:s.view||null,lock:!!s.lock,uri:s.uri||null});
-    if(typeof s.text==='string'){src.value=s.text;st.name=s.name||'Untitled.md';st.dirty=!!s.dirty;return s.text.length>0;}}catch(e){}
+var $ = id => document.getElementById(id);
+var src = $('src'),
+  out = $('out'),
+  main = $('main'),
+  editPane = $('editPane'),
+  readPane = $('readPane'),
+  fmtbar = $('fmtbar');
+var KEY = 'padmd.v1';
+var st = {
+  name: 'Untitled.md',
+  dirty: false,
+  handle: null,
+  uri: null,
+  view: null,
+  theme: 'auto',
+  fs: 17,
+  font: 'sans',
+  efont: 'mono',
+  savedAt: null
+};
+var lastToc = [];
+function loadState() {
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || '{}');
+    Object.assign(st, {
+      theme: s.theme || 'auto',
+      fs: s.fs || 17,
+      font: s.font || 'sans',
+      efont: s.efont || 'mono',
+      view: s.view || null,
+      lock: !!s.lock,
+      uri: s.uri || null
+    });
+    if (typeof s.text === 'string') {
+      src.value = s.text;
+      st.name = s.name || 'Untitled.md';
+      st.dirty = !!s.dirty;
+      return s.text.length > 0;
+    }
+  } catch (e) {}
   return false;
 }
-let saveT=null;
-function persist(now){if(now&&richDirty){richDirty=false;src.value=toMd(out);}clearTimeout(saveT);const go=()=>{try{localStorage.setItem(KEY,JSON.stringify({text:src.value,name:st.name,dirty:st.dirty,theme:st.theme,fs:st.fs,font:st.font,efont:st.efont,view:st.view,lock:st.lock,uri:st.uri}));}catch(e){}};now?go():saveT=setTimeout(go,400);}
-
-function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
-function status(msg,cls){const s=$('status');s.textContent=msg;s.className=cls||'';}
-function setDirty(d){st.dirty=d;$('dirty').classList.toggle('on',d);status(d?'Draft kept on this tablet':'Saved',d?'':'ok');}
-function setName(n){n=(n||'').trim()||'Untitled';if(!/\.(md|markdown|txt)$/i.test(n))n+='.md';st.name=n;$('docName').textContent=n;document.title=n.replace(/\.(md|markdown)$/i,'')+' · padMD';}
-
-/* ── Rendering: Markdown text → formatted page ── */
-let renT=null,richDirty=false,richT=null;
-function counts(){
-  const text=st.view==='wyg'?out.innerText||'':src.value;
-  const words=(text.match(/[A-Za-z0-9À-ɏ'’]+/g)||[]).length;
-  $('wc').textContent=words.toLocaleString('en-NZ')+' word'+(words===1?'':'s');
-  $('rt').textContent=words>200?'· '+Math.ceil(words/220)+' min read':'';
+var saveT = null;
+function persist(now) {
+  if (now && richDirty) {
+    richDirty = false;
+    src.value = toMd(out);
+  }
+  clearTimeout(saveT);
+  var go = () => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        text: src.value,
+        name: st.name,
+        dirty: st.dirty,
+        theme: st.theme,
+        fs: st.fs,
+        font: st.font,
+        efont: st.efont,
+        view: st.view,
+        lock: st.lock,
+        uri: st.uri
+      }));
+    } catch (e) {}
+  };
+  now ? go() : saveT = setTimeout(go, 400);
 }
-function markEmpty(){out.classList.toggle('isempty',!out.textContent.trim()&&!out.querySelector('img,hr,table,input,li'));}
-function render(){
-  const text=src.value;
-  out.innerHTML=text.trim()?MD.render(text).html:'<p><br></p>';
-  out.querySelectorAll('input[type=checkbox]').forEach(c=>c.setAttribute('contenteditable','false'));
-  richDirty=false;clearTimeout(richT);markEmpty();counts();
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('on'), 2200);
 }
-function queueRender(){clearTimeout(renT);renT=setTimeout(counts,300);}
-/* Formatted page → Markdown text (only after edits in WYG, so untouched files keep their exact text) */
-function flushRich(){clearTimeout(richT);if(!richDirty)return;richDirty=false;src.value=toMd(out);persist();counts();}
-function sync(){if(richDirty)flushRich();}
-function richChanged(){richDirty=true;markEmpty();if(!st.dirty)setDirty(true);clearTimeout(richT);richT=setTimeout(flushRich,400);}
-
-/* ── Modes: WYG (type on the formatted page) and MD (Markdown text) ── */
-function setView(v){
-  if(v!=='md')v='wyg';
-  const was=st.view;
-  if(was==='wyg'&&v==='md')flushRich();
-  st.view=v;persist();
-  editPane.classList.toggle('hide',v!=='md');readPane.classList.toggle('hide',v!=='wyg');
-  main.classList.add('single');
-  if(v==='wyg'){$('findbar').classList.remove('on');if(was!=='wyg')render();}
-  out.contentEditable=st.lock?'false':'true';
-  fmtbar.classList.toggle('hide',v==='wyg'&&st.lock);
-  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+function status(msg, cls) {
+  var s = $('status');
+  s.textContent = msg;
+  s.className = cls || '';
+}
+function setDirty(d) {
+  st.dirty = d;
+  $('dirty').classList.toggle('on', d);
+  status(d ? 'Draft kept on this tablet' : 'Saved', d ? '' : 'ok');
+}
+function setName(n) {
+  n = (n || '').trim() || 'Untitled';
+  if (!/\.(md|markdown|txt)$/i.test(n)) n += '.md';
+  st.name = n;
+  $('docName').textContent = n;
+  document.title = n.replace(/\.(md|markdown)$/i, '') + ' · padMD';
+}
+var renT = null,
+  richDirty = false,
+  richT = null;
+function counts() {
+  var text = st.view === 'wyg' ? out.innerText || '' : src.value;
+  var words = (text.match(/[A-Za-z0-9À-ɏ'’]+/g) || []).length;
+  $('wc').textContent = words.toLocaleString('en-NZ') + ' word' + (words === 1 ? '' : 's');
+  $('rt').textContent = words > 200 ? '· ' + Math.ceil(words / 220) + ' min read' : '';
+}
+function markEmpty() {
+  out.classList.toggle('isempty', !out.textContent.trim() && !out.querySelector('img,hr,table,input,li'));
+}
+function render() {
+  var text = src.value;
+  out.innerHTML = text.trim() ? MD.render(text).html : '<p><br></p>';
+  out.querySelectorAll('input[type=checkbox]').forEach(c => c.setAttribute('contenteditable', 'false'));
+  richDirty = false;
+  clearTimeout(richT);
+  markEmpty();
   counts();
 }
-document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{const f=st.view!==b.dataset.view;setView(b.dataset.view);if(f&&!st.lock)(st.view==='md'?src:out).focus({preventScroll:true});});
-
-/* ── Appearance ── */
-function applyLook(){
-  const r=document.documentElement;
-  if(st.theme==='auto')r.removeAttribute('data-theme');else r.dataset.theme=st.theme;
-  r.style.setProperty('--fs',st.fs+'px');
-  document.body.classList.toggle('serif',st.font==='serif');
-  document.body.classList.toggle('sansedit',st.efont==='sans');
-  const dark=st.theme==='dark'||(st.theme==='auto'&&!matchMedia('(prefers-color-scheme: light)').matches);
-  document.querySelector('meta[name=theme-color]').content=dark?'#212426':'#ffffff';
-  const mark=(id,val)=>document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===val));
-  mark('themeSeg',st.theme);mark('lockSeg',st.lock?'on':'off');mark('fontSeg',st.font);mark('efontSeg',st.efont);
+function queueRender() {
+  clearTimeout(renT);
+  renT = setTimeout(counts, 300);
+}
+function flushRich() {
+  clearTimeout(richT);
+  if (!richDirty) return;
+  richDirty = false;
+  src.value = toMd(out);
+  persist();
+  counts();
+}
+function sync() {
+  if (richDirty) flushRich();
+}
+function richChanged() {
+  richDirty = true;
+  markEmpty();
+  if (!st.dirty) setDirty(true);
+  clearTimeout(richT);
+  richT = setTimeout(flushRich, 400);
+}
+function setView(v) {
+  if (v !== 'md') v = 'wyg';
+  var was = st.view;
+  if (was === 'wyg' && v === 'md') flushRich();
+  st.view = v;
+  persist();
+  editPane.classList.toggle('hide', v !== 'md');
+  readPane.classList.toggle('hide', v !== 'wyg');
+  main.classList.add('single');
+  if (v === 'wyg') {
+    $('findbar').classList.remove('on');
+    if (was !== 'wyg') render();
+  }
+  out.contentEditable = st.lock ? 'false' : 'true';
+  fmtbar.classList.toggle('hide', v === 'wyg' && st.lock);
+  document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  counts();
+}
+document.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => {
+  var f = st.view !== b.dataset.view;
+  setView(b.dataset.view);
+  if (f && !st.lock) (st.view === 'md' ? src : out).focus({
+    preventScroll: true
+  });
+});
+function applyLook() {
+  var r = document.documentElement;
+  if (st.theme === 'auto') r.removeAttribute('data-theme');else r.dataset.theme = st.theme;
+  r.style.setProperty('--fs', st.fs + 'px');
+  document.body.classList.toggle('serif', st.font === 'serif');
+  document.body.classList.toggle('sansedit', st.efont === 'sans');
+  var dark = st.theme === 'dark' || st.theme === 'auto' && !matchMedia('(prefers-color-scheme: light)').matches;
+  document.querySelector('meta[name=theme-color]').content = dark ? '#212426' : '#ffffff';
+  var mark = (id, val) => document.querySelectorAll('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
+  mark('themeSeg', st.theme);
+  mark('lockSeg', st.lock ? 'on' : 'off');
+  mark('fontSeg', st.font);
+  mark('efontSeg', st.efont);
   persist();
 }
-document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick=()=>{st.theme=b.dataset.v;applyLook();});
-document.querySelectorAll('#lockSeg button').forEach(b=>b.onclick=()=>{st.lock=b.dataset.v==='on';applyLook();setView(st.view);toast(st.lock?'WYG is read only. Tap On to type again':'You can type in WYG');});
-document.querySelectorAll('#fontSeg button').forEach(b=>b.onclick=()=>{st.font=b.dataset.v;applyLook();});
-document.querySelectorAll('#efontSeg button').forEach(b=>b.onclick=()=>{st.efont=b.dataset.v;applyLook();});
-$('fsDown').onclick=()=>{st.fs=Math.max(13,st.fs-1);applyLook();toast('Text size '+st.fs);};
-$('fsUp').onclick=()=>{st.fs=Math.min(28,st.fs+1);applyLook();toast('Text size '+st.fs);};
-
-/* ════════════════════════════════════════════════════════════
-   Editing helpers. Changes go through the browser's own text
-   insertion so that Undo and Redo keep working.
-   ════════════════════════════════════════════════════════════ */
-function replaceRange(a,b,text,selA,selB){
-  src.focus();src.setSelectionRange(a,b);
-  const want=src.value.slice(0,a)+text+src.value.slice(b);
-  let ok=false;try{ok=a===b&&!text?true:document.execCommand(text?'insertText':'delete',false,text);}catch(e){}
-  if(!ok||src.value!==want){src.value=want;src.dispatchEvent(new Event('input'));}
-  if(selA==null)selA=a+text.length;
-  src.setSelectionRange(selA,selB??selA);
+document.querySelectorAll('#themeSeg button').forEach(b => b.onclick = () => {
+  st.theme = b.dataset.v;
+  applyLook();
+});
+document.querySelectorAll('#lockSeg button').forEach(b => b.onclick = () => {
+  st.lock = b.dataset.v === 'on';
+  applyLook();
+  setView(st.view);
+  toast(st.lock ? 'WYG is read only. Tap On to type again' : 'You can type in WYG');
+});
+document.querySelectorAll('#fontSeg button').forEach(b => b.onclick = () => {
+  st.font = b.dataset.v;
+  applyLook();
+});
+document.querySelectorAll('#efontSeg button').forEach(b => b.onclick = () => {
+  st.efont = b.dataset.v;
+  applyLook();
+});
+$('fsDown').onclick = () => {
+  st.fs = Math.max(13, st.fs - 1);
+  applyLook();
+  toast('Text size ' + st.fs);
+};
+$('fsUp').onclick = () => {
+  st.fs = Math.min(28, st.fs + 1);
+  applyLook();
+  toast('Text size ' + st.fs);
+};
+function replaceRange(a, b, text, selA, selB) {
+  src.focus();
+  src.setSelectionRange(a, b);
+  var want = src.value.slice(0, a) + text + src.value.slice(b);
+  var ok = false;
+  try {
+    ok = a === b && !text ? true : document.execCommand(text ? 'insertText' : 'delete', false, text);
+  } catch (e) {}
+  if (!ok || src.value !== want) {
+    src.value = want;
+    src.dispatchEvent(new Event('input'));
+  }
+  if (selA == null) selA = a + text.length;
+  src.setSelectionRange(selA, selB !== null && selB !== void 0 ? selB : selA);
 }
-function wrap(before,after,ph){
-  const a=src.selectionStart,b=src.selectionEnd,sel=src.value.slice(a,b);
-  if(sel&&sel.startsWith(before)&&sel.endsWith(after)&&sel.length>=before.length+after.length){
-    const inner=sel.slice(before.length,sel.length-after.length);replaceRange(a,b,inner,a,a+inner.length);return;}
-  if(src.value.slice(a-before.length,a)===before&&src.value.slice(b,b+after.length)===after){
-    replaceRange(a-before.length,b+after.length,sel,a-before.length,b-before.length);return;}
-  const t=sel||ph;replaceRange(a,b,before+t+after,a+before.length,a+before.length+t.length);
+function wrap(before, after, ph) {
+  var a = src.selectionStart,
+    b = src.selectionEnd,
+    sel = src.value.slice(a, b);
+  if (sel && sel.startsWith(before) && sel.endsWith(after) && sel.length >= before.length + after.length) {
+    var inner = sel.slice(before.length, sel.length - after.length);
+    replaceRange(a, b, inner, a, a + inner.length);
+    return;
+  }
+  if (src.value.slice(a - before.length, a) === before && src.value.slice(b, b + after.length) === after) {
+    replaceRange(a - before.length, b + after.length, sel, a - before.length, b - before.length);
+    return;
+  }
+  var t = sel || ph;
+  replaceRange(a, b, before + t + after, a + before.length, a + before.length + t.length);
 }
-function lineBounds(){
-  const v=src.value,a=src.selectionStart,b=src.selectionEnd;
-  const s=v.lastIndexOf('\n',a-1)+1;let e=v.indexOf('\n',b>a&&v[b-1]==='\n'?b-1:b);if(e<0)e=v.length;return[s,e];
+function lineBounds() {
+  var v = src.value,
+    a = src.selectionStart,
+    b = src.selectionEnd;
+  var s = v.lastIndexOf('\n', a - 1) + 1;
+  var e = v.indexOf('\n', b > a && v[b - 1] === '\n' ? b - 1 : b);
+  if (e < 0) e = v.length;
+  return [s, e];
 }
-function mapLines(fn){
-  const[s,e]=lineBounds(),lines=src.value.slice(s,e).split('\n');
-  const nl=lines.map(fn).join('\n');replaceRange(s,e,nl,s+(lines.length===1?nl.length:0),s+nl.length);
-  if(lines.length===1)src.setSelectionRange(s+nl.length,s+nl.length);
+function mapLines(fn) {
+  var _lineBounds = lineBounds(),
+    _lineBounds2 = _slicedToArray(_lineBounds, 2),
+    s = _lineBounds2[0],
+    e = _lineBounds2[1],
+    lines = src.value.slice(s, e).split('\n');
+  var nl = lines.map(fn).join('\n');
+  replaceRange(s, e, nl, s + (lines.length === 1 ? nl.length : 0), s + nl.length);
+  if (lines.length === 1) src.setSelectionRange(s + nl.length, s + nl.length);
 }
-const reListPrefix=/^(\s*)([-*+] \[[ xX]\] |[-*+] |\d+[.)] )?/;
-function setHeading(n){mapLines(l=>{const m=l.match(/^(#{1,6})\s+/);const body=l.replace(/^#{1,6}\s+/,'');return m&&m[1].length===n?body:'#'.repeat(n)+' '+body;});}
-function setList(kind){
-  let k=0;
-  mapLines(l=>{const m=l.match(reListPrefix),ind=m[1],cur=m[2]||'',body=l.slice(m[0].length);
-    const isUl=/^[-*+] $/.test(cur),isOl=/^\d/.test(cur),isTask=/\[/.test(cur);
-    if(kind==='ul')return isUl?ind+body:ind+'- '+body;
-    if(kind==='ol')return isOl?ind+body:ind+(++k)+'. '+body;
-    if(kind==='task')return isTask?ind+body:ind+'- [ ] '+body;
+var reListPrefix = /^(\s*)([-*+] \[[ xX]\] |[-*+] |\d+[.)] )?/;
+function setHeading(n) {
+  mapLines(l => {
+    var m = l.match(/^(#{1,6})\s+/);
+    var body = l.replace(/^#{1,6}\s+/, '');
+    return m && m[1].length === n ? body : '#'.repeat(n) + ' ' + body;
   });
 }
-function prefixLines(p){mapLines(l=>l.startsWith(p)?l.slice(p.length):p+l);}
-function indent(dir){mapLines(l=>dir>0?'  '+l:l.replace(/^ {1,2}|^\t/,''));}
-function insertBlock(text,selOffset,selLen){
-  const a=src.selectionStart,b=src.selectionEnd,v=src.value;
-  const pre=a>0&&v[a-1]!=='\n'?'\n\n':(a>1&&v[a-2]!=='\n'?'\n':'');
-  const post=v[b]&&v[b]!=='\n'?'\n\n':'\n';
-  const s=a+pre.length+(selOffset??text.length);
-  replaceRange(a,b,pre+text+post,s,s+(selLen||0));
+function setList(kind) {
+  var k = 0;
+  mapLines(l => {
+    var m = l.match(reListPrefix),
+      ind = m[1],
+      cur = m[2] || '',
+      body = l.slice(m[0].length);
+    var isUl = /^[-*+] $/.test(cur),
+      isOl = /^\d/.test(cur),
+      isTask = /\[/.test(cur);
+    if (kind === 'ul') return isUl ? ind + body : ind + '- ' + body;
+    if (kind === 'ol') return isOl ? ind + body : ind + ++k + '. ' + body;
+    if (kind === 'task') return isTask ? ind + body : ind + '- [ ] ' + body;
+  });
 }
-function todayNZ(){return new Date().toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'});}
-
-const actions={
-  undo:()=>{src.focus();document.execCommand('undo');},
-  redo:()=>{src.focus();document.execCommand('redo');},
-  h1:()=>setHeading(1),h2:()=>setHeading(2),h3:()=>setHeading(3),
-  bold:()=>wrap('**','**','bold text'),italic:()=>wrap('*','*','italic text'),
-  strike:()=>wrap('~~','~~','struck text'),mark:()=>wrap('==','==','highlighted text'),
-  code:()=>wrap('`','`','code'),
-  ul:()=>setList('ul'),ol:()=>setList('ol'),task:()=>setList('task'),
-  indent:()=>indent(1),outdent:()=>indent(-1),
-  quote:()=>prefixLines('> '),
-  hr:()=>insertBlock('---'),
-  date:()=>{const d=todayNZ();replaceRange(src.selectionStart,src.selectionEnd,d,src.selectionStart+d.length);},
-  codeblock:()=>{const sel=src.value.slice(src.selectionStart,src.selectionEnd)||'code here';insertBlock('```\n'+sel+'\n```',4,sel.length);},
-  table:()=>insertBlock('| Heading | Heading | Heading |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |',2,7),
-  link:()=>askLink(false),image:()=>askLink(true),
-  find:()=>toggleFind(true)
+function prefixLines(p) {
+  mapLines(l => l.startsWith(p) ? l.slice(p.length) : p + l);
+}
+function _indent(dir) {
+  mapLines(l => dir > 0 ? '  ' + l : l.replace(/^ {1,2}|^\t/, ''));
+}
+function insertBlock(text, selOffset, selLen) {
+  var a = src.selectionStart,
+    b = src.selectionEnd,
+    v = src.value;
+  var pre = a > 0 && v[a - 1] !== '\n' ? '\n\n' : a > 1 && v[a - 2] !== '\n' ? '\n' : '';
+  var post = v[b] && v[b] !== '\n' ? '\n\n' : '\n';
+  var s = a + pre.length + (selOffset !== null && selOffset !== void 0 ? selOffset : text.length);
+  replaceRange(a, b, pre + text + post, s, s + (selLen || 0));
+}
+function todayNZ() {
+  return new Date().toLocaleDateString('en-NZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+var actions = {
+  undo: () => {
+    src.focus();
+    document.execCommand('undo');
+  },
+  redo: () => {
+    src.focus();
+    document.execCommand('redo');
+  },
+  h1: () => setHeading(1),
+  h2: () => setHeading(2),
+  h3: () => setHeading(3),
+  bold: () => wrap('**', '**', 'bold text'),
+  italic: () => wrap('*', '*', 'italic text'),
+  strike: () => wrap('~~', '~~', 'struck text'),
+  mark: () => wrap('==', '==', 'highlighted text'),
+  code: () => wrap('`', '`', 'code'),
+  ul: () => setList('ul'),
+  ol: () => setList('ol'),
+  task: () => setList('task'),
+  indent: () => _indent(1),
+  outdent: () => _indent(-1),
+  quote: () => prefixLines('> '),
+  hr: () => insertBlock('---'),
+  date: () => {
+    var d = todayNZ();
+    replaceRange(src.selectionStart, src.selectionEnd, d, src.selectionStart + d.length);
+  },
+  codeblock: () => {
+    var sel = src.value.slice(src.selectionStart, src.selectionEnd) || 'code here';
+    insertBlock('```\n' + sel + '\n```', 4, sel.length);
+  },
+  table: () => insertBlock('| Heading | Heading | Heading |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |', 2, 7),
+  link: () => askLink(false),
+  image: () => askLink(true),
+  find: () => toggleFind(true)
 };
-fmtbar.addEventListener('pointerdown',e=>{if(e.target.closest('.fb'))e.preventDefault();});  // keep the keyboard open
-fmtbar.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const A=st.view==='wyg'?richActions:actions;if(A[b.dataset.a])A[b.dataset.a]();});
-
-function askLink(img){
-  const a=src.selectionStart,b=src.selectionEnd,sel=src.value.slice(a,b);
-  dialog({title:img?'Insert a picture':'Insert a link',text:img?'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.':'Paste or type the web address.',
-    input:'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
-      if(!url||url==='https://')return;
-      if(img){const alt=sel||'picture';replaceRange(a,b,`![${alt}](${url})`,a+2,a+2+alt.length);}
-      else{const txt=sel||'link text';replaceRange(a,b,`[${txt}](${url})`,a+1,a+1+txt.length);}
-    }}]});
-}
-
-/* ── Smart Enter: carry on lists and checklists, end them on an empty item ── */
-function handleEnter(){
-  const v=src.value,a=src.selectionStart;if(a!==src.selectionEnd)return false;
-  const s=v.lastIndexOf('\n',a-1)+1,line=v.slice(s,a);
-  const m=line.match(/^(\s*)((?:[-*+] \[[ xX]\] )|(?:[-*+] )|(?:(\d+)([.)]) )|(?:> ))(.*)$/);
-  if(!m)return false;
-  const[,ind,mk,num,delim,body]=m;
-  if(!body.trim()){replaceRange(s,a,ind.length>=2?ind.slice(2)+mk.replace(/\d+/,'1'):'',null);return true;}
-  let next=mk;if(num)next=(parseInt(num)+1)+delim+' ';else if(/\[[xX]\]/.test(mk))next=mk.replace(/\[[xX]\]/,'[ ]');
-  replaceRange(a,a,'\n'+ind+next,null);return true;
-}
-src.addEventListener('beforeinput',e=>{
-  if((e.inputType==='insertLineBreak'||e.inputType==='insertParagraph')&&!e.isComposing){if(handleEnter())e.preventDefault();}
+fmtbar.addEventListener('pointerdown', e => {
+  if (e.target.closest('.fb')) e.preventDefault();
 });
-src.addEventListener('keydown',e=>{
-  const mod=e.ctrlKey||e.metaKey;
-  if(e.key==='Tab'){e.preventDefault();const a=src.selectionStart,b=src.selectionEnd;
-    if(a===b&&!e.shiftKey&&!/^\s*([-*+]|\d+[.)])\s/.test(src.value.slice(src.value.lastIndexOf('\n',a-1)+1,a+1)))replaceRange(a,a,'    ',a+4);else indent(e.shiftKey?-1:1);return;}
-  if(!mod)return;
-  const k=e.key.toLowerCase(),map={b:'bold',i:'italic',k:'link',f:'find',h:'find','1':'h1','2':'h2','3':'h3'};
-  if(map[k]&&!e.altKey){e.preventDefault();actions[map[k]]();}
+fmtbar.addEventListener('click', e => {
+  var b = e.target.closest('[data-a]');
+  if (!b) return;
+  var A = st.view === 'wyg' ? richActions : actions;
+  if (A[b.dataset.a]) A[b.dataset.a]();
 });
-src.addEventListener('input',()=>{if(!st.dirty)setDirty(true);persist();queueRender();});
-
-/* ════════════════════════════════════════════════════════════
-   WYG mode: typing on the formatted page.
-   The page is turned back into Markdown text after each edit.
-   ════════════════════════════════════════════════════════════ */
-const BLK=/^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|TABLE|HR|SECTION|ARTICLE|FIGURE|DETAILS|DL)$/;
-function escTxt(t){
-  return t.replace(/[\u200b\ufeff]/g,'').replace(/ /g,' ').replace(/([\\`*])/g,'\\$1')
-    .replace(/_/g,(m,i,x)=>/\w/.test(x[i-1]||'')&&/\w/.test(x[i+1]||'')?'_':'\\_')
-    .replace(/~~/g,'\\~\\~').replace(/==/g,'\\=\\=').replace(/\[(?=[^\]]*\]\()/g,'\\[');
+function askLink(img) {
+  var a = src.selectionStart,
+    b = src.selectionEnd,
+    sel = src.value.slice(a, b);
+  dialog({
+    title: img ? 'Insert a picture' : 'Insert a link',
+    text: img ? 'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.' : 'Paste or type the web address.',
+    input: 'https://',
+    buttons: [{
+      label: 'Cancel'
+    }, {
+      label: 'Insert',
+      primary: true,
+      run: url => {
+        if (!url || url === 'https://') return;
+        if (img) {
+          var alt = sel || 'picture';
+          replaceRange(a, b, `![${alt}](${url})`, a + 2, a + 2 + alt.length);
+        } else {
+          var txt = sel || 'link text';
+          replaceRange(a, b, `[${txt}](${url})`, a + 1, a + 1 + txt.length);
+        }
+      }
+    }]
+  });
 }
-function lineEsc(l){
-  if(/^(#{1,6}(\s|$)|[-+*]\s|>|```|~~~|(-\s*){3,}$)/.test(l))return '\\'+l;
-  return l.replace(/^(\d+)([.)]\s)/,'$1\\$2');
+function handleEnter() {
+  var v = src.value,
+    a = src.selectionStart;
+  if (a !== src.selectionEnd) return false;
+  var s = v.lastIndexOf('\n', a - 1) + 1,
+    line = v.slice(s, a);
+  var m = line.match(/^(\s*)((?:[-*+] \[[ xX]\] )|(?:[-*+] )|(?:(\d+)([.)]) )|(?:> ))(.*)$/);
+  if (!m) return false;
+  var _m = _slicedToArray(m, 6),
+    ind = _m[1],
+    mk = _m[2],
+    num = _m[3],
+    delim = _m[4],
+    body = _m[5];
+  if (!body.trim()) {
+    replaceRange(s, a, ind.length >= 2 ? ind.slice(2) + mk.replace(/\d+/, '1') : '', null);
+    return true;
+  }
+  var next = mk;
+  if (num) next = parseInt(num) + 1 + delim + ' ';else if (/\[[xX]\]/.test(mk)) next = mk.replace(/\[[xX]\]/, '[ ]');
+  replaceRange(a, a, '\n' + ind + next, null);
+  return true;
 }
-function isLastContent(n){for(let x=n.nextSibling;x;x=x.nextSibling){if(x.nodeType===1||(x.nodeType===3&&x.nodeValue.trim()))return false;}return true;}
-function inl(n,inTable){
-  let s='';
-  for(const c of n.childNodes){
-    if(c.nodeType===3){s+=escTxt(c.nodeValue.replace(/\s*\n\s*/g,' '));continue;}
-    if(c.nodeType!==1)continue;
-    const t=c.tagName,style=c.getAttribute('style')||'';
-    if(t==='BR'){if(!isLastContent(c))s+=inTable?'<br>':'\\\n';continue;}
-    if(t==='INPUT'||t==='SCRIPT'||t==='STYLE')continue;
-    if(t==='IMG'){s+=`![${(c.getAttribute('alt')||'').replace(/[\[\]]/g,'')}](${(c.getAttribute('src')||'').replace(/ /g,'%20')})`;continue;}
-    if(t==='CODE'){const tx=c.textContent;if(tx){const f=tx.includes('`')?'``':'`';s+=f+(f==='``'?' '+tx+' ':tx)+f;}continue;}
-    const inner=inl(c,inTable);
-    const wrap=m=>{const p=inner.match(/^(\s*)([\s\S]*?)(\s*)$/);return p[2]?p[1]+m+p[2]+m+p[3]:inner;};
-    if(t==='B'||t==='STRONG'||/font-weight:\s*(bold|[6-9]00)/.test(style))s+=wrap('**');
-    else if(t==='I'||t==='EM'||/font-style:\s*italic/.test(style))s+=wrap('*');
-    else if(t==='S'||t==='DEL'||t==='STRIKE')s+=wrap('~~');
-    else if(t==='MARK')s+=wrap('==');
-    else if(t==='A'){const h=c.getAttribute('href')||'';s+=h&&inner.trim()?`[${inner}](${h.replace(/ /g,'%20').replace(/\)/g,'%29')})`:inner;}
-    else if(BLK.test(t)||t==='LI'){s+=(s&&!/\n$/.test(s)?'\\\n':'')+inner;}
-    else s+=inner;
+src.addEventListener('beforeinput', e => {
+  if ((e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') && !e.isComposing) {
+    if (handleEnter()) e.preventDefault();
+  }
+});
+src.addEventListener('keydown', e => {
+  var mod = e.ctrlKey || e.metaKey;
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var a = src.selectionStart,
+      b = src.selectionEnd;
+    if (a === b && !e.shiftKey && !/^\s*([-*+]|\d+[.)])\s/.test(src.value.slice(src.value.lastIndexOf('\n', a - 1) + 1, a + 1))) replaceRange(a, a, '    ', a + 4);else _indent(e.shiftKey ? -1 : 1);
+    return;
+  }
+  if (!mod) return;
+  var k = e.key.toLowerCase(),
+    map = {
+      b: 'bold',
+      i: 'italic',
+      k: 'link',
+      f: 'find',
+      h: 'find',
+      '1': 'h1',
+      '2': 'h2',
+      '3': 'h3'
+    };
+  if (map[k] && !e.altKey) {
+    e.preventDefault();
+    actions[map[k]]();
+  }
+});
+src.addEventListener('input', () => {
+  if (!st.dirty) setDirty(true);
+  persist();
+  queueRender();
+});
+var BLK = /^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|TABLE|HR|SECTION|ARTICLE|FIGURE|DETAILS|DL)$/;
+function escTxt(t) {
+  return t.replace(/[\u200b\ufeff]/g, '').replace(/ /g, ' ').replace(/([\\`*])/g, '\\$1').replace(/_/g, (m, i, x) => /\w/.test(x[i - 1] || '') && /\w/.test(x[i + 1] || '') ? '_' : '\\_').replace(/~~/g, '\\~\\~').replace(/==/g, '\\=\\=').replace(/\[(?=[^\]]*\]\()/g, '\\[');
+}
+function lineEsc(l) {
+  if (/^(#{1,6}(\s|$)|[-+*]\s|>|```|~~~|(-\s*){3,}$)/.test(l)) return '\\' + l;
+  return l.replace(/^(\d+)([.)]\s)/, '$1\\$2');
+}
+function isLastContent(n) {
+  for (var x = n.nextSibling; x; x = x.nextSibling) {
+    if (x.nodeType === 1 || x.nodeType === 3 && x.nodeValue.trim()) return false;
+  }
+  return true;
+}
+function inl(n, inTable) {
+  var s = '';
+  var _iterator2 = _createForOfIteratorHelper(n.childNodes),
+    _step2;
+  try {
+    var _loop3 = function _loop3() {
+        var c = _step2.value;
+        if (c.nodeType === 3) {
+          s += escTxt(c.nodeValue.replace(/\s*\n\s*/g, ' '));
+          return 0;
+        }
+        if (c.nodeType !== 1) return 0;
+        var t = c.tagName,
+          style = c.getAttribute('style') || '';
+        if (t === 'BR') {
+          if (!isLastContent(c)) s += inTable ? '<br>' : '\\\n';
+          return 0;
+        }
+        if (t === 'INPUT' || t === 'SCRIPT' || t === 'STYLE') return 0;
+        if (t === 'IMG') {
+          s += `![${(c.getAttribute('alt') || '').replace(/[\[\]]/g, '')}](${(c.getAttribute('src') || '').replace(/ /g, '%20')})`;
+          return 0;
+        }
+        if (t === 'CODE') {
+          var tx = c.textContent;
+          if (tx) {
+            var f = tx.includes('`') ? '``' : '`';
+            s += f + (f === '``' ? ' ' + tx + ' ' : tx) + f;
+          }
+          return 0;
+        }
+        var inner = inl(c, inTable);
+        var wrap = m => {
+          var p = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
+          return p[2] ? p[1] + m + p[2] + m + p[3] : inner;
+        };
+        if (t === 'B' || t === 'STRONG' || /font-weight:\s*(bold|[6-9]00)/.test(style)) s += wrap('**');else if (t === 'I' || t === 'EM' || /font-style:\s*italic/.test(style)) s += wrap('*');else if (t === 'S' || t === 'DEL' || t === 'STRIKE') s += wrap('~~');else if (t === 'MARK') s += wrap('==');else if (t === 'A') {
+          var h = c.getAttribute('href') || '';
+          s += h && inner.trim() ? `[${inner}](${h.replace(/ /g, '%20').replace(/\)/g, '%29')})` : inner;
+        } else if (BLK.test(t) || t === 'LI') {
+          s += (s && !/\n$/.test(s) ? '\\\n' : '') + inner;
+        } else s += inner;
+      },
+      _ret2;
+    for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+      _ret2 = _loop3();
+      if (_ret2 === 0) continue;
+    }
+  } catch (err) {
+    _iterator2.e(err);
+  } finally {
+    _iterator2.f();
   }
   return s;
 }
-function runText(nodes){const span=document.createElement('span');nodes.forEach(n=>span.appendChild(n.cloneNode(true)));
-  return inl(span).replace(/\\\n +/g,'\\\n').trim().split('\n').map(lineEsc).join('\n');}
-function blocks(n){
-  const outB=[];let run=[];
-  const flush=()=>{if(run.length){const t=runText(run);if(t)outB.push(t);}run=[];};
-  for(const c of n.childNodes){
-    if(c.nodeType===1&&BLK.test(c.tagName)){flush();const b=blk(c);if(b)outB.push(b);}
-    else if(c.nodeType===1&&c.tagName==='LI'){flush();const b=list({tagName:'UL',children:[c],getAttribute:()=>null});if(b)outB.push(b);}
-    else run.push(c);
-  }
-  flush();return outB.join('\n\n');
+function runText(nodes) {
+  var span = document.createElement('span');
+  nodes.forEach(n => span.appendChild(n.cloneNode(true)));
+  return inl(span).replace(/\\\n +/g, '\\\n').trim().split('\n').map(lineEsc).join('\n');
 }
-function blk(c){
-  const t=c.tagName;
-  if(/^H[1-6]$/.test(t)){const x=inl(c).replace(/\\\n/g,' ').trim();return x?'#'.repeat(+t[1])+' '+x:'';}
-  if(t==='HR')return '---';
-  if(t==='PRE'){const code=c.querySelector('code');const lang=((code&&code.className||'').match(/lang-(\S+)/)||[])[1]||'';
-    let tx=(c.innerText||c.textContent).replace(/\n$/,'');const f=tx.includes('```')?'~~~':'```';return tx.trim()||lang?f+lang+'\n'+tx+'\n'+f:'';}
-  if(t==='BLOCKQUOTE'){const x=blocks(c);return x?x.split('\n').map(l=>l?'> '+l:'>').join('\n'):'';}
-  if(t==='UL'||t==='OL')return list(c);
-  if(t==='TABLE')return table(c);
+function blocks(n) {
+  var outB = [];
+  var run = [];
+  var flush = () => {
+    if (run.length) {
+      var t = runText(run);
+      if (t) outB.push(t);
+    }
+    run = [];
+  };
+  var _iterator3 = _createForOfIteratorHelper(n.childNodes),
+    _step3;
+  try {
+    for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+      var c = _step3.value;
+      if (c.nodeType === 1 && BLK.test(c.tagName)) {
+        flush();
+        var b = blk(c);
+        if (b) outB.push(b);
+      } else if (c.nodeType === 1 && c.tagName === 'LI') {
+        flush();
+        var _b = list({
+          tagName: 'UL',
+          children: [c],
+          getAttribute: () => null
+        });
+        if (_b) outB.push(_b);
+      } else run.push(c);
+    }
+  } catch (err) {
+    _iterator3.e(err);
+  } finally {
+    _iterator3.f();
+  }
+  flush();
+  return outB.join('\n\n');
+}
+function blk(c) {
+  var t = c.tagName;
+  if (/^H[1-6]$/.test(t)) {
+    var x = inl(c).replace(/\\\n/g, ' ').trim();
+    return x ? '#'.repeat(+t[1]) + ' ' + x : '';
+  }
+  if (t === 'HR') return '---';
+  if (t === 'PRE') {
+    var code = c.querySelector('code');
+    var lang = ((code && code.className || '').match(/lang-(\S+)/) || [])[1] || '';
+    var tx = (c.innerText || c.textContent).replace(/\n$/, '');
+    var f = tx.includes('```') ? '~~~' : '```';
+    return tx.trim() || lang ? f + lang + '\n' + tx + '\n' + f : '';
+  }
+  if (t === 'BLOCKQUOTE') {
+    var _x = blocks(c);
+    return _x ? _x.split('\n').map(l => l ? '> ' + l : '>').join('\n') : '';
+  }
+  if (t === 'UL' || t === 'OL') return list(c);
+  if (t === 'TABLE') return table(c);
   return blocks(c);
 }
-function list(el){
-  const ord=el.tagName==='OL';let n=parseInt(el.getAttribute('start')||'1')||1;const lines=[];
-  for(const c of el.children){
-    if(c.tagName==='UL'||c.tagName==='OL'){const sub=list(c);if(sub)lines.push(sub.split('\n').map(l=>l?(ord?'   ':'  ')+l:l).join('\n'));continue;}
-    if(c.tagName!=='LI')continue;
-    const cb=[...c.children].find(x=>x.tagName==='INPUT'&&x.type==='checkbox');
-    const num=ord?(n++)+'. ':'- ',pad=' '.repeat(num.length);
-    const mk=num+(cb?(cb.checked?'[x] ':'[ ] '):'');
-    let first=null;const rest=[];let run=[];
-    const flush=()=>{if(run.length){const t=runText(run);if(t){if(first==null&&!rest.length)first=t;else rest.push(t);}}run=[];};
-    for(const ch of c.childNodes){
-      if(ch.nodeType===1&&(ch.tagName==='UL'||ch.tagName==='OL')){flush();if(first==null)first='';const x=list(ch);if(x)rest.push(x);}
-      else if(ch.nodeType===1&&BLK.test(ch.tagName)){flush();const x=blk(ch);if(x){if(first==null&&!rest.length&&/^(P|DIV)$/.test(ch.tagName))first=x;else rest.push(x);}}
-      else run.push(ch);
+function list(el) {
+  var ord = el.tagName === 'OL';
+  var n = parseInt(el.getAttribute('start') || '1') || 1;
+  var lines = [];
+  var _iterator4 = _createForOfIteratorHelper(el.children),
+    _step4;
+  try {
+    var _loop4 = function _loop4() {
+        var c = _step4.value;
+        if (c.tagName === 'UL' || c.tagName === 'OL') {
+          var sub = list(c);
+          if (sub) lines.push(sub.split('\n').map(l => l ? (ord ? '   ' : '  ') + l : l).join('\n'));
+          return 0;
+        }
+        if (c.tagName !== 'LI') return 0;
+        var cb = [...c.children].find(x => x.tagName === 'INPUT' && x.type === 'checkbox');
+        var num = ord ? n++ + '. ' : '- ',
+          pad = ' '.repeat(num.length);
+        var mk = num + (cb ? cb.checked ? '[x] ' : '[ ] ' : '');
+        var first = null;
+        var rest = [];
+        var run = [];
+        var flush = () => {
+          if (run.length) {
+            var t = runText(run);
+            if (t) {
+              if (first == null && !rest.length) first = t;else rest.push(t);
+            }
+          }
+          run = [];
+        };
+        var _iterator5 = _createForOfIteratorHelper(c.childNodes),
+          _step5;
+        try {
+          for (_iterator5.s(); !(_step5 = _iterator5.n()).done;) {
+            var ch = _step5.value;
+            if (ch.nodeType === 1 && (ch.tagName === 'UL' || ch.tagName === 'OL')) {
+              flush();
+              if (first == null) first = '';
+              var x = list(ch);
+              if (x) rest.push(x);
+            } else if (ch.nodeType === 1 && BLK.test(ch.tagName)) {
+              flush();
+              var _x2 = blk(ch);
+              if (_x2) {
+                if (first == null && !rest.length && /^(P|DIV)$/.test(ch.tagName)) first = _x2;else rest.push(_x2);
+              }
+            } else run.push(ch);
+          }
+        } catch (err) {
+          _iterator5.e(err);
+        } finally {
+          _iterator5.f();
+        }
+        flush();
+        var item = mk + (first || '').split('\n').map((l, i) => i ? pad + l : l).join('\n');
+        if (rest.length) item += '\n' + rest.map(r => r.split('\n').map(l => l ? pad + l : l).join('\n')).join('\n');
+        lines.push(item.replace(/\s+$/, ''));
+      },
+      _ret3;
+    for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
+      _ret3 = _loop4();
+      if (_ret3 === 0) continue;
     }
-    flush();
-    let item=mk+(first||'').split('\n').map((l,i)=>i?pad+l:l).join('\n');
-    if(rest.length)item+='\n'+rest.map(r=>r.split('\n').map(l=>l?pad+l:l).join('\n')).join('\n');
-    lines.push(item.replace(/\s+$/,''));
+  } catch (err) {
+    _iterator4.e(err);
+  } finally {
+    _iterator4.f();
   }
   return lines.join('\n');
 }
-function table(el){
-  const rows=[...el.querySelectorAll('tr')];if(!rows.length)return '';
-  const w=Math.max(...rows.map(r=>r.children.length));
-  const cell=c=>c?(inl(c,true).trim().replace(/\|/g,'\\|')||' '):' ';
-  const line=r=>'| '+Array.from({length:w},(_,k)=>cell(r.children[k])).join(' | ')+' |';
-  const al=Array.from({length:w},(_,k)=>{const c=rows[0].children[k];const a=c&&c.style.textAlign;return a==='center'?':---:':a==='right'?'---:':'---';});
-  return [line(rows[0]),'| '+al.join(' | ')+' |',...rows.slice(1).map(line)].join('\n');
+function table(el) {
+  var rows = [...el.querySelectorAll('tr')];
+  if (!rows.length) return '';
+  var w = Math.max(...rows.map(r => r.children.length));
+  var cell = c => c ? inl(c, true).trim().replace(/\|/g, '\\|') || ' ' : ' ';
+  var line = r => '| ' + Array.from({
+    length: w
+  }, (_, k) => cell(r.children[k])).join(' | ') + ' |';
+  var al = Array.from({
+    length: w
+  }, (_, k) => {
+    var c = rows[0].children[k];
+    var a = c && c.style.textAlign;
+    return a === 'center' ? ':---:' : a === 'right' ? '---:' : '---';
+  });
+  return [line(rows[0]), '| ' + al.join(' | ') + ' |', ...rows.slice(1).map(line)].join('\n');
 }
-function toMd(root){const md=blocks(root).replace(/\n{3,}/g,'\n\n').trim();return md?md+'\n':'';}
-
-/* ── Helpers for the WYG toolbar ── */
-function selNode(){const s=getSelection();if(!s.rangeCount)return null;const n=s.anchorNode;return out.contains(n)?n:null;}
-function closestTag(re){let n=selNode();while(n&&n!==out){if(n.nodeType===1&&re.test(n.tagName))return n;n=n.parentNode;}return null;}
-function curBlock(){return closestTag(/^(P|DIV|H[1-6]|LI|PRE|BLOCKQUOTE|TD|TH)$/);}
-function ensureFocus(){if(!out.contains(document.activeElement)&&document.activeElement!==out){out.focus();
-  if(!selNode()){const r=document.createRange();r.selectNodeContents(out);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);}}}
-function cmd(c,v){ensureFocus();document.execCommand(c,false,v==null?null:v);}
-function toggleBlock(tag){const b=curBlock();cmd('formatBlock',b&&b.tagName===tag?'<p>':'<'+tag.toLowerCase()+'>');}
-function wrapInline(tag,ph){
-  ensureFocus();const el=closestTag(new RegExp('^'+tag+'$'));
-  if(el){const r=document.createRange();r.selectNode(el);const s=getSelection();s.removeAllRanges();s.addRange(r);cmd('insertHTML',el.innerHTML||'');return;}
-  const s=getSelection();if(!s.rangeCount)return;const r=s.getRangeAt(0);
-  const d=document.createElement('div');d.appendChild(r.cloneContents());
-  cmd('insertHTML',`<${tag.toLowerCase()}>${d.innerHTML||ph}</${tag.toLowerCase()}>&#8203;`);
+function toMd(root) {
+  var md = blocks(root).replace(/\n{3,}/g, '\n\n').trim();
+  return md ? md + '\n' : '';
 }
-function addCheckbox(li,checked){const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('contenteditable','false');cb.checked=!!checked;if(checked)cb.setAttribute('checked','');
-  li.insertBefore(cb,li.firstChild);li.classList.add('task');li.classList.toggle('done',!!checked);
-  if(!li.lastChild||li.lastChild===cb)li.appendChild(document.createElement('br'));
-  const s=getSelection();if(s.rangeCount&&li.contains(s.anchorNode)){const n=s.anchorNode;if(n===li&&s.anchorOffset===0)s.collapse(li,1);}}
-/* Chrome sometimes puts lists inside paragraphs; lift them out and keep the cursor where it was */
-function normalise(){
-  const s=getSelection(),n=s.anchorNode,o=s.anchorOffset;let moved=false;
-  out.querySelectorAll('p,h1,h2,h3,h4,h5,h6').forEach(p=>{if([...p.children].some(c=>/^(UL|OL|P|DIV|BLOCKQUOTE|PRE|TABLE|H[1-6])$/.test(c.tagName))){p.replaceWith(...p.childNodes);moved=true;}});
-  out.querySelectorAll('li').forEach(li=>{const cb=liBox(li);if(cb&&li.firstChild!==cb){const pos=n&&li.contains(n);li.insertBefore(cb,li.firstChild);moved=moved||pos;}});
-  if(moved&&n&&out.contains(n)){try{s.collapse(n,o);}catch(e){}}
+function selNode() {
+  var s = getSelection();
+  if (!s.rangeCount) return null;
+  var n = s.anchorNode;
+  return out.contains(n) ? n : null;
 }
-function liBox(li){return li&&[...li.children].find(x=>x.tagName==='INPUT'&&x.type==='checkbox');}
-let savedRange=null;
-function saveRange(){const s=getSelection();savedRange=s.rangeCount&&out.contains(s.anchorNode)?s.getRangeAt(0).cloneRange():null;}
-function restoreRange(){out.focus();if(savedRange){const s=getSelection();s.removeAllRanges();s.addRange(savedRange);}}
-const escA=t=>t.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-
-const richActions={
-  undo:()=>cmd('undo'),redo:()=>cmd('redo'),
-  h1:()=>toggleBlock('H1'),h2:()=>toggleBlock('H2'),h3:()=>toggleBlock('H3'),
-  bold:()=>cmd('bold'),italic:()=>cmd('italic'),strike:()=>cmd('strikeThrough'),
-  mark:()=>wrapInline('MARK','highlighted text'),code:()=>wrapInline('CODE','code'),
-  ul:()=>{cmd('insertUnorderedList');normalise();},ol:()=>{cmd('insertOrderedList');normalise();},
-  task:()=>{ensureFocus();let li=closestTag(/^LI$/);const box=liBox(li);
-    if(box){box.remove();li.classList.remove('task','done');richChanged();return;}
-    if(!li||li.parentNode.tagName!=='UL'){cmd('insertUnorderedList');normalise();}
-    li=closestTag(/^LI$/);if(li){addCheckbox(li);richChanged();}},
-  indent:()=>closestTag(/^LI$/)?cmd('indent'):toast('Move left and right works on list items'),
-  outdent:()=>closestTag(/^LI$/)?cmd('outdent'):toast('Move left and right works on list items'),
-  quote:()=>{const q=closestTag(/^BLOCKQUOTE$/);
-    if(q){while(q.firstChild)q.parentNode.insertBefore(q.firstChild,q);q.remove();richChanged();}else cmd('formatBlock','<blockquote>');},
-  codeblock:()=>toggleBlock('PRE'),
-  hr:()=>cmd('insertHorizontalRule'),
-  date:()=>cmd('insertText',todayNZ()),
-  table:()=>cmd('insertHTML','<table><thead><tr><th>Heading</th><th>Heading</th><th>Heading</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>'),
-  link:()=>{ensureFocus();saveRange();const a=closestTag(/^A$/);
-    dialog({title:'Insert a link',text:'Paste or type the web address.',input:a?a.getAttribute('href'):'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
-      restoreRange();if(!url||url==='https://')return;
-      if(a){a.setAttribute('href',url);richChanged();return;}
-      const sel=getSelection().toString();
-      if(sel)cmd('createLink',url);else cmd('insertHTML',`<a href="${escA(url)}">${escA(url)}</a>&nbsp;`);}}]}).then(v=>{if(v==null)restoreRange();});},
-  image:()=>{ensureFocus();saveRange();
-    dialog({title:'Insert a picture',text:'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.',input:'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
-      restoreRange();if(!url||url==='https://')return;cmd('insertHTML',`<img src="${escA(url)}" alt="picture">`);}}]}).then(v=>{if(v==null)restoreRange();});},
-  find:()=>{setView('md');toggleFind(true);}
-};
-
-/* Typing shortcuts: "# " heading, "- " bullet, "1. " numbers, "[] " tick box, "> " quote, "``` " code */
-function autoFormat(){
-  let b=curBlock();const s=getSelection();
-  if(!b&&s.anchorNode&&out.contains(s.anchorNode)){cmd('formatBlock','<p>');b=curBlock();}
-  if(!b||!/^(P|DIV|LI)$/.test(b.tagName))return;if(!s.isCollapsed)return;
-  const r=document.createRange();r.setStart(b,0);r.setEnd(s.anchorNode,s.anchorOffset);
-  const t=r.toString().replace(/ /g,' ');
-  if(b.tagName==='LI'){if(/^\[ ?\] $/.test(t)&&!liBox(b)){s.removeAllRanges();s.addRange(r);document.execCommand('delete');addCheckbox(b);richChanged();}return;}
-  const m=t.match(/^(#{1,6}|[-*+]|1[.)]|>|\[ ?\]|```) $/);if(!m)return;
-  s.removeAllRanges();s.addRange(r);document.execCommand('delete');
-  const k=m[1];
-  if(k[0]==='#')cmd('formatBlock','<h'+k.length+'>');
-  else if(/^[-*+]$/.test(k)){cmd('insertUnorderedList');normalise();}
-  else if(/^1/.test(k)){cmd('insertOrderedList');normalise();}
-  else if(k==='>')cmd('formatBlock','<blockquote>');
-  else if(k==='```')cmd('formatBlock','<pre>');
-  else richActions.task();
-}
-out.addEventListener('beforeinput',e=>{
-  if(e.inputType!=='insertParagraph'&&e.inputType!=='insertLineBreak')return;
-  const li=closestTag(/^LI$/);
-  if(!li){const q=closestTag(/^BLOCKQUOTE$/),b=curBlock();
-    if(q&&b&&!b.textContent.trim()){e.preventDefault();cmd('formatBlock','<p>');richChanged();}return;}
-  if(li.textContent.trim()||li.querySelector('img'))return;
-  e.preventDefault();cmd('outdent');normalise();
-  const li2=closestTag(/^LI$/);if(li2&&li2!==li&&!liBox(li2.previousElementSibling))liBox(li2)?.remove();
-  if(!closestTag(/^LI$/)){const b=curBlock();if(!b||b.tagName==='DIV')cmd('formatBlock','<p>');}
-  out.querySelectorAll('input[type=checkbox]').forEach(cb=>{if(!cb.closest('li'))cb.remove();});
-  richChanged();
-});
-out.addEventListener('input',e=>{
-  normalise();
-  if(e.inputType==='insertText'&&e.data===' ')autoFormat();
-  if(e.inputType==='insertParagraph'||e.inputType==='insertLineBreak'){
-    const li=closestTag(/^LI$/),prev=li&&li.previousElementSibling;
-    if(li&&liBox(prev)){const box=liBox(li);if(!box)addCheckbox(li);else if(box.checked&&!li.textContent.trim()){box.checked=false;box.removeAttribute('checked');li.classList.remove('done');}}
-    if(li&&!liBox(prev)&&liBox(li)&&prev)liBox(li).remove();
+function closestTag(re) {
+  var n = selNode();
+  while (n && n !== out) {
+    if (n.nodeType === 1 && re.test(n.tagName)) return n;
+    n = n.parentNode;
   }
-  out.querySelectorAll('li.task').forEach(li=>{if(!liBox(li))li.classList.remove('task','done');});
+  return null;
+}
+function curBlock() {
+  return closestTag(/^(P|DIV|H[1-6]|LI|PRE|BLOCKQUOTE|TD|TH)$/);
+}
+function ensureFocus() {
+  if (!out.contains(document.activeElement) && document.activeElement !== out) {
+    out.focus();
+    if (!selNode()) {
+      var r = document.createRange();
+      r.selectNodeContents(out);
+      r.collapse(false);
+      var s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+  }
+}
+function cmd(c, v) {
+  ensureFocus();
+  document.execCommand(c, false, v == null ? null : v);
+}
+function toggleBlock(tag) {
+  var b = curBlock();
+  cmd('formatBlock', b && b.tagName === tag ? '<p>' : '<' + tag.toLowerCase() + '>');
+}
+function wrapInline(tag, ph) {
+  ensureFocus();
+  var el = closestTag(new RegExp('^' + tag + '$'));
+  if (el) {
+    var _r = document.createRange();
+    _r.selectNode(el);
+    var _s = getSelection();
+    _s.removeAllRanges();
+    _s.addRange(_r);
+    cmd('insertHTML', el.innerHTML || '');
+    return;
+  }
+  var s = getSelection();
+  if (!s.rangeCount) return;
+  var r = s.getRangeAt(0);
+  var d = document.createElement('div');
+  d.appendChild(r.cloneContents());
+  cmd('insertHTML', `<${tag.toLowerCase()}>${d.innerHTML || ph}</${tag.toLowerCase()}>&#8203;`);
+}
+function addCheckbox(li, checked) {
+  var cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.setAttribute('contenteditable', 'false');
+  cb.checked = !!checked;
+  if (checked) cb.setAttribute('checked', '');
+  li.insertBefore(cb, li.firstChild);
+  li.classList.add('task');
+  li.classList.toggle('done', !!checked);
+  if (!li.lastChild || li.lastChild === cb) li.appendChild(document.createElement('br'));
+  var s = getSelection();
+  if (s.rangeCount && li.contains(s.anchorNode)) {
+    var n = s.anchorNode;
+    if (n === li && s.anchorOffset === 0) s.collapse(li, 1);
+  }
+}
+function normalise() {
+  var s = getSelection(),
+    n = s.anchorNode,
+    o = s.anchorOffset;
+  var moved = false;
+  out.querySelectorAll('p,h1,h2,h3,h4,h5,h6').forEach(p => {
+    if ([...p.children].some(c => /^(UL|OL|P|DIV|BLOCKQUOTE|PRE|TABLE|H[1-6])$/.test(c.tagName))) {
+      p.replaceWith(...p.childNodes);
+      moved = true;
+    }
+  });
+  out.querySelectorAll('li').forEach(li => {
+    var cb = liBox(li);
+    if (cb && li.firstChild !== cb) {
+      var pos = n && li.contains(n);
+      li.insertBefore(cb, li.firstChild);
+      moved = moved || pos;
+    }
+  });
+  if (moved && n && out.contains(n)) {
+    try {
+      s.collapse(n, o);
+    } catch (e) {}
+  }
+}
+function liBox(li) {
+  return li && [...li.children].find(x => x.tagName === 'INPUT' && x.type === 'checkbox');
+}
+var savedRange = null;
+function saveRange() {
+  var s = getSelection();
+  savedRange = s.rangeCount && out.contains(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
+}
+function restoreRange() {
+  out.focus();
+  if (savedRange) {
+    var s = getSelection();
+    s.removeAllRanges();
+    s.addRange(savedRange);
+  }
+}
+var escA = t => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+var richActions = {
+  undo: () => cmd('undo'),
+  redo: () => cmd('redo'),
+  h1: () => toggleBlock('H1'),
+  h2: () => toggleBlock('H2'),
+  h3: () => toggleBlock('H3'),
+  bold: () => cmd('bold'),
+  italic: () => cmd('italic'),
+  strike: () => cmd('strikeThrough'),
+  mark: () => wrapInline('MARK', 'highlighted text'),
+  code: () => wrapInline('CODE', 'code'),
+  ul: () => {
+    cmd('insertUnorderedList');
+    normalise();
+  },
+  ol: () => {
+    cmd('insertOrderedList');
+    normalise();
+  },
+  task: () => {
+    ensureFocus();
+    var li = closestTag(/^LI$/);
+    var box = liBox(li);
+    if (box) {
+      box.remove();
+      li.classList.remove('task', 'done');
+      richChanged();
+      return;
+    }
+    if (!li || li.parentNode.tagName !== 'UL') {
+      cmd('insertUnorderedList');
+      normalise();
+    }
+    li = closestTag(/^LI$/);
+    if (li) {
+      addCheckbox(li);
+      richChanged();
+    }
+  },
+  indent: () => closestTag(/^LI$/) ? cmd('indent') : toast('Move left and right works on list items'),
+  outdent: () => closestTag(/^LI$/) ? cmd('outdent') : toast('Move left and right works on list items'),
+  quote: () => {
+    var q = closestTag(/^BLOCKQUOTE$/);
+    if (q) {
+      while (q.firstChild) q.parentNode.insertBefore(q.firstChild, q);
+      q.remove();
+      richChanged();
+    } else cmd('formatBlock', '<blockquote>');
+  },
+  codeblock: () => toggleBlock('PRE'),
+  hr: () => cmd('insertHorizontalRule'),
+  date: () => cmd('insertText', todayNZ()),
+  table: () => cmd('insertHTML', '<table><thead><tr><th>Heading</th><th>Heading</th><th>Heading</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>'),
+  link: () => {
+    ensureFocus();
+    saveRange();
+    var a = closestTag(/^A$/);
+    dialog({
+      title: 'Insert a link',
+      text: 'Paste or type the web address.',
+      input: a ? a.getAttribute('href') : 'https://',
+      buttons: [{
+        label: 'Cancel'
+      }, {
+        label: 'Insert',
+        primary: true,
+        run: url => {
+          restoreRange();
+          if (!url || url === 'https://') return;
+          if (a) {
+            a.setAttribute('href', url);
+            richChanged();
+            return;
+          }
+          var sel = getSelection().toString();
+          if (sel) cmd('createLink', url);else cmd('insertHTML', `<a href="${escA(url)}">${escA(url)}</a>&nbsp;`);
+        }
+      }]
+    }).then(v => {
+      if (v == null) restoreRange();
+    });
+  },
+  image: () => {
+    ensureFocus();
+    saveRange();
+    dialog({
+      title: 'Insert a picture',
+      text: 'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.',
+      input: 'https://',
+      buttons: [{
+        label: 'Cancel'
+      }, {
+        label: 'Insert',
+        primary: true,
+        run: url => {
+          restoreRange();
+          if (!url || url === 'https://') return;
+          cmd('insertHTML', `<img src="${escA(url)}" alt="picture">`);
+        }
+      }]
+    }).then(v => {
+      if (v == null) restoreRange();
+    });
+  },
+  find: () => {
+    setView('md');
+    toggleFind(true);
+  }
+};
+function autoFormat() {
+  var b = curBlock();
+  var s = getSelection();
+  if (!b && s.anchorNode && out.contains(s.anchorNode)) {
+    cmd('formatBlock', '<p>');
+    b = curBlock();
+  }
+  if (!b || !/^(P|DIV|LI)$/.test(b.tagName)) return;
+  if (!s.isCollapsed) return;
+  var r = document.createRange();
+  r.setStart(b, 0);
+  r.setEnd(s.anchorNode, s.anchorOffset);
+  var t = r.toString().replace(/ /g, ' ');
+  if (b.tagName === 'LI') {
+    if (/^\[ ?\] $/.test(t) && !liBox(b)) {
+      s.removeAllRanges();
+      s.addRange(r);
+      document.execCommand('delete');
+      addCheckbox(b);
+      richChanged();
+    }
+    return;
+  }
+  var m = t.match(/^(#{1,6}|[-*+]|1[.)]|>|\[ ?\]|```) $/);
+  if (!m) return;
+  s.removeAllRanges();
+  s.addRange(r);
+  document.execCommand('delete');
+  var k = m[1];
+  if (k[0] === '#') cmd('formatBlock', '<h' + k.length + '>');else if (/^[-*+]$/.test(k)) {
+    cmd('insertUnorderedList');
+    normalise();
+  } else if (/^1/.test(k)) {
+    cmd('insertOrderedList');
+    normalise();
+  } else if (k === '>') cmd('formatBlock', '<blockquote>');else if (k === '```') cmd('formatBlock', '<pre>');else richActions.task();
+}
+out.addEventListener('beforeinput', e => {
+  var _liBox;
+  if (e.inputType !== 'insertParagraph' && e.inputType !== 'insertLineBreak') return;
+  var li = closestTag(/^LI$/);
+  if (!li) {
+    var q = closestTag(/^BLOCKQUOTE$/),
+      b = curBlock();
+    if (q && b && !b.textContent.trim()) {
+      e.preventDefault();
+      cmd('formatBlock', '<p>');
+      richChanged();
+    }
+    return;
+  }
+  if (li.textContent.trim() || li.querySelector('img')) return;
+  e.preventDefault();
+  cmd('outdent');
+  normalise();
+  var li2 = closestTag(/^LI$/);
+  if (li2 && li2 !== li && !liBox(li2.previousElementSibling)) (_liBox = liBox(li2)) === null || _liBox === void 0 || _liBox.remove();
+  if (!closestTag(/^LI$/)) {
+    var _b2 = curBlock();
+    if (!_b2 || _b2.tagName === 'DIV') cmd('formatBlock', '<p>');
+  }
+  out.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if (!cb.closest('li')) cb.remove();
+  });
   richChanged();
 });
-out.addEventListener('change',e=>{const cb=e.target;if(!(cb.tagName==='INPUT'&&cb.type==='checkbox'))return;
-  cb.toggleAttribute('checked',cb.checked);const li=cb.closest('li');if(li)li.classList.toggle('done',cb.checked);richChanged();flushRich();});
-out.addEventListener('paste',e=>{
-  const cd=e.clipboardData;if(!cd)return;const html=cd.getData('text/html'),txt=cd.getData('text/plain');
+out.addEventListener('input', e => {
+  normalise();
+  if (e.inputType === 'insertText' && e.data === ' ') autoFormat();
+  if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+    var li = closestTag(/^LI$/),
+      prev = li && li.previousElementSibling;
+    if (li && liBox(prev)) {
+      var box = liBox(li);
+      if (!box) addCheckbox(li);else if (box.checked && !li.textContent.trim()) {
+        box.checked = false;
+        box.removeAttribute('checked');
+        li.classList.remove('done');
+      }
+    }
+    if (li && !liBox(prev) && liBox(li) && prev) liBox(li).remove();
+  }
+  out.querySelectorAll('li.task').forEach(li => {
+    if (!liBox(li)) li.classList.remove('task', 'done');
+  });
+  richChanged();
+});
+out.addEventListener('change', e => {
+  var cb = e.target;
+  if (!(cb.tagName === 'INPUT' && cb.type === 'checkbox')) return;
+  cb.toggleAttribute('checked', cb.checked);
+  var li = cb.closest('li');
+  if (li) li.classList.toggle('done', cb.checked);
+  richChanged();
+  flushRich();
+});
+out.addEventListener('paste', e => {
+  var cd = e.clipboardData;
+  if (!cd) return;
+  var html = cd.getData('text/html'),
+    txt = cd.getData('text/plain');
   e.preventDefault();
-  if(html){const d=document.createElement('div');d.innerHTML=html;cmd('insertHTML',MD.render(toMd(d)).html);}
-  else if(txt&&/\n/.test(txt))cmd('insertHTML',MD.render(txt).html);
-  else if(txt)cmd('insertText',txt);
+  if (html) {
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    cmd('insertHTML', MD.render(toMd(d)).html);
+  } else if (txt && /\n/.test(txt)) cmd('insertHTML', MD.render(txt).html);else if (txt) cmd('insertText', txt);
 });
-out.addEventListener('keydown',e=>{
-  const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-  if(e.key==='Tab'&&closestTag(/^LI$/)){e.preventDefault();cmd(e.shiftKey?'outdent':'indent');return;}
-  if(!mod||e.altKey)return;
-  const map={k:'link',f:'find',h:'find','1':'h1','2':'h2','3':'h3'};
-  if(map[k]){e.preventDefault();richActions[map[k]]();}
+out.addEventListener('keydown', e => {
+  var mod = e.ctrlKey || e.metaKey,
+    k = e.key.toLowerCase();
+  if (e.key === 'Tab' && closestTag(/^LI$/)) {
+    e.preventDefault();
+    cmd(e.shiftKey ? 'outdent' : 'indent');
+    return;
+  }
+  if (!mod || e.altKey) return;
+  var map = {
+    k: 'link',
+    f: 'find',
+    h: 'find',
+    '1': 'h1',
+    '2': 'h2',
+    '3': 'h3'
+  };
+  if (map[k]) {
+    e.preventDefault();
+    richActions[map[k]]();
+  }
 });
-out.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;
-  if(out.isContentEditable&&!e.ctrlKey){e.preventDefault();return;}
-  const h=a.getAttribute('href')||'';if(h.startsWith('#')){e.preventDefault();document.getElementById(decodeURIComponent(h.slice(1)))?.scrollIntoView({behavior:'smooth'});}});
-readPane.addEventListener('click',e=>{if(e.target!==readPane||!out.isContentEditable)return;
-  out.focus();const r=document.createRange();r.selectNodeContents(out.lastElementChild||out);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);});
-
-/* ════════════════════════════════════════════════════════════
-   Find and replace
-   ════════════════════════════════════════════════════════════ */
-let hits=[],hitI=-1;
-function toggleFind(on){const fb=$('findbar');fb.classList.toggle('on',on);if(on){if(st.view!=='md')setView('md');
-  const sel=src.value.slice(src.selectionStart,src.selectionEnd);if(sel&&!sel.includes('\n'))$('findIn').value=sel;$('findIn').focus();$('findIn').select();doFind();}}
-function doFind(){const q=$('findIn').value;hits=[];if(q){const v=src.value.toLowerCase(),ql=q.toLowerCase();let p=0;while((p=v.indexOf(ql,p))>=0){hits.push(p);p+=ql.length||1;}}
-  const cur=src.selectionStart;hitI=hits.findIndex(h=>h>=cur);if(hitI<0&&hits.length)hitI=0;showCount();}
-function showCount(){$('findCnt').textContent=$('findIn').value?(hits.length?(hitI+1)+' of '+hits.length:'None'):'';}
-function goHit(d){if(!hits.length)return;hitI=(hitI+d+hits.length)%hits.length;const p=hits[hitI],q=$('findIn').value.length;
-  src.focus();src.setSelectionRange(p,p+q);const before=src.value.slice(0,p).split('\n').length;
-  const lh=parseFloat(getComputedStyle(src).lineHeight)||26;src.scrollTop=Math.max(0,before*lh-src.clientHeight/3);showCount();}
-$('findIn').addEventListener('input',doFind);
-$('findIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();goHit(e.shiftKey?-1:1);}if(e.key==='Escape')toggleFind(false);});
-$('findNext').onclick=()=>goHit(1);$('findPrev').onclick=()=>goHit(-1);
-$('replOne').onclick=()=>{const q=$('findIn').value;if(!q||!hits.length)return;const p=hits[hitI<0?0:hitI];
-  replaceRange(p,p+q.length,$('replIn').value);doFind();hitI=hits.findIndex(h=>h>=p);if(hitI<0)hitI=0;if(hits.length)goHit(0);else showCount();};
-$('replAll').onclick=()=>{const q=$('findIn').value;if(!q||!hits.length)return;const n=hits.length;
-  const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');const nv=src.value.replace(re,()=>$('replIn').value);
-  replaceRange(0,src.value.length,nv,0);doFind();toast(n+' replaced');};
-$('findClose').onclick=()=>toggleFind(false);
-
-/* ════════════════════════════════════════════════════════════
-   Files: open, save, share
-   ════════════════════════════════════════════════════════════ */
-const hasPicker='showSaveFilePicker' in window&&'showOpenFilePicker' in window;
-/* ── Android app bridge (only present when padMD runs as the Android app) ── */
-const AND=window.Android||null;
-if(AND)document.documentElement.classList.add('app');
-window.padLoad=(t,name,uri,writable)=>{(async()=>{
-  if(st.dirty&&src.value.trim()&&src.value!==t&&!(await confirmDiscard()))return;
-  loadText(t,name||'Untitled.md',null);st.uri=writable?uri:null;persist(true);})();};
-window.padSaved=(uri,name)=>{st.uri=uri;setName(name);setDirty(false);persist(true);toast('Saved '+st.name);};
-window.padToast=m=>toast(m);
-window.padBack=()=>{if(document.querySelector('.sheet.on')){if(dlgCancel)dlgCancel();closeSheets();return true;}
-  if($('findbar').classList.contains('on')){toggleFind(false);return true;}persist(true);return false;};
-async function openFile(){sync();
-  if(AND){if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;AND.openFile();return;}
-  if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;
-  if(hasPicker){try{const[h]=await showOpenFilePicker({types:[{description:'Markdown',accept:{'text/markdown':['.md','.markdown','.txt']}}]});
-      const f=await h.getFile();loadText(await f.text(),f.name,h);}catch(e){if(e.name!=='AbortError')toast('Could not open that file');}return;}
-  $('fileIn').value='';$('fileIn').click();
+out.addEventListener('click', e => {
+  var a = e.target.closest('a');
+  if (!a) return;
+  if (out.isContentEditable && !e.ctrlKey) {
+    e.preventDefault();
+    return;
+  }
+  var h = a.getAttribute('href') || '';
+  if (h.startsWith('#')) {
+    var _document$getElementB;
+    e.preventDefault();
+    (_document$getElementB = document.getElementById(decodeURIComponent(h.slice(1)))) === null || _document$getElementB === void 0 || _document$getElementB.scrollIntoView({
+      behavior: 'smooth'
+    });
+  }
+});
+readPane.addEventListener('click', e => {
+  if (e.target !== readPane || !out.isContentEditable) return;
+  out.focus();
+  var r = document.createRange();
+  r.selectNodeContents(out.lastElementChild || out);
+  r.collapse(false);
+  var s = getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+});
+var hits = [],
+  hitI = -1;
+function toggleFind(on) {
+  var fb = $('findbar');
+  fb.classList.toggle('on', on);
+  if (on) {
+    if (st.view !== 'md') setView('md');
+    var sel = src.value.slice(src.selectionStart, src.selectionEnd);
+    if (sel && !sel.includes('\n')) $('findIn').value = sel;
+    $('findIn').focus();
+    $('findIn').select();
+    doFind();
+  }
 }
-$('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
-  if(f.size>8e6){toast('That file is too big to edit here');return;}
-  const t=await f.text();if(/\u0000/.test(t.slice(0,2000))){toast('That doesn’t look like a text file');return;}
-  loadText(t,f.name,null);};
-function loadText(t,name,handle){richDirty=false;st.uri=null;
-  src.value=t.replace(/\r\n?/g,'\n');setName(name);st.handle=handle;setDirty(false);persist(true);render();
-  src.setSelectionRange(0,0);src.scrollTop=0;readPane.scrollTop=0;
-  toast('Opened '+st.name);
+function doFind() {
+  var q = $('findIn').value;
+  hits = [];
+  if (q) {
+    var v = src.value.toLowerCase(),
+      ql = q.toLowerCase();
+    var p = 0;
+    while ((p = v.indexOf(ql, p)) >= 0) {
+      hits.push(p);
+      p += ql.length || 1;
+    }
+  }
+  var cur = src.selectionStart;
+  hitI = hits.findIndex(h => h >= cur);
+  if (hitI < 0 && hits.length) hitI = 0;
+  showCount();
 }
-function blob(){return new Blob([src.value],{type:'text/markdown;charset=utf-8'});}
-function download(b,name){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);}
-async function save(asNew){sync();
-  if(AND){if(st.uri&&!asNew)AND.saveTo(st.uri,src.value,st.name);else{if(asNew){const n=await askName('Save as','Choose where to save it on the next screen.');if(n==null)return;setName(n);}AND.saveAs(st.name,src.value,'text/markdown',true);}return;}
-  if(hasPicker){try{
-      if(!st.handle||asNew)st.handle=await showSaveFilePicker({suggestedName:st.name,types:[{description:'Markdown',accept:{'text/markdown':['.md']}}]});
-      const w=await st.handle.createWritable();await w.write(blob());await w.close();setName(st.handle.name);setDirty(false);persist(true);toast('Saved '+st.name);return;
-    }catch(e){if(e.name==='AbortError')return;st.handle=null;}}
-  if(asNew||st.name==='Untitled.md'){const n=await askName('Save as','The file goes to your Downloads folder. Use Share to send it to OneDrive, Google Drive or another app.');if(n==null)return;setName(n);}
-  download(blob(),st.name);setDirty(false);persist(true);toast('Saved to Downloads as '+st.name);
+function showCount() {
+  $('findCnt').textContent = $('findIn').value ? hits.length ? hitI + 1 + ' of ' + hits.length : 'None' : '';
 }
-async function share(){sync();
-  if(AND){AND.share(st.name,src.value);return;}
-  const file=new File([src.value],st.name,{type:'text/plain'});
-  try{
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:st.name});return;}
-    if(navigator.share){await navigator.share({title:st.name,text:src.value});return;}
-  }catch(e){if(e.name==='AbortError')return;}
-  await navigator.clipboard?.writeText(src.value);toast('Sharing isn’t available here, so the text was copied instead');
+function goHit(d) {
+  if (!hits.length) return;
+  hitI = (hitI + d + hits.length) % hits.length;
+  var p = hits[hitI],
+    q = $('findIn').value.length;
+  src.focus();
+  src.setSelectionRange(p, p + q);
+  var before = src.value.slice(0, p).split('\n').length;
+  var lh = parseFloat(getComputedStyle(src).lineHeight) || 26;
+  src.scrollTop = Math.max(0, before * lh - src.clientHeight / 3);
+  showCount();
 }
-function exportHtml(){sync();
-  const r=MD.render(src.value),title=st.name.replace(/\.(md|markdown|txt)$/i,'');
-  const css=[...document.styleSheets[0].cssRules].map(x=>x.cssText).filter(t=>/^(:root|\.md|@page|@media \(prefers)/.test(t)).join('\n');
-  const html=`<!DOCTYPE html><html lang="en-NZ"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/</g,'&lt;')}</title><style>${css}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}.md{padding:28px 24px 60px}</style></head><body><article class="md">${r.html}</article></body></html>`;
-  if(AND){AND.saveAs(title+'.html',html,'text/html',false);return;}
-  download(new Blob([html],{type:'text/html;charset=utf-8'}),title+'.html');toast('Downloaded '+title+'.html');
-}
-function newDoc(){(async()=>{if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;
-  src.value='';setName('Untitled.md');st.handle=null;st.uri=null;setDirty(false);persist(true);render();if(!st.lock)(st.view==='md'?src:out).focus();toast('New document ready, start typing');})();}
-$('openBtn').onclick=openFile;$('saveBtn').onclick=()=>save(false);$('shareBtn').onclick=share;
-$('nameBtn').onclick=async()=>{const n=await askName('Rename','This changes the name used next time you save.');if(n!=null){setName(n);persist();}};
-document.addEventListener('keydown',e=>{const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-  if(mod&&k==='s'){e.preventDefault();save(e.shiftKey);}else if(mod&&k==='o'){e.preventDefault();openFile();}
-  else if(mod&&k==='p'){e.preventDefault();doPrint();}else if(e.key==='Escape'){closeSheets();}});
-window.addEventListener('beforeunload',()=>persist(true));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)persist(true);});
-
-function doPrint(){sync();const v=st.view;if(v==='md'){render();readPane.classList.remove('hide');}setTimeout(()=>{if(AND)AND.print(st.name.replace(/\.(md|markdown|txt)$/i,''));else window.print();if(v==='md')readPane.classList.add('hide');},50);}
-
-/* ════════════════════════════════════════════════════════════
-   Menus, contents list and small dialogs
-   ════════════════════════════════════════════════════════════ */
-function closeSheets(){document.querySelectorAll('.sheet.on').forEach(s=>s.classList.remove('on'));$('scrim').classList.remove('on');$('menuBtn').classList.remove('on');$('tocBtn').classList.remove('on');}
-function openSheet(id){closeSheets();$(id).classList.add('on');$('scrim').classList.add('on');}
-$('scrim').onclick=()=>{if(dlgCancel)dlgCancel();closeSheets();};
-$('menuBtn').onclick=()=>{const on=$('menu').classList.contains('on');closeSheets();if(!on){openSheet('menu');$('menuBtn').classList.add('on');}};
-$('menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;closeSheets();
-  ({new:newDoc,saveas:()=>save(true),copy:async()=>{sync();try{await navigator.clipboard.writeText(src.value);toast('Markdown copied');}catch(_){src.select();document.execCommand('copy');toast('Markdown copied');}},
-    copyhtml:exportHtml,print:doPrint,help:showHelp})[b.dataset.m]();});
-$('tocBtn').onclick=()=>{
-  if($('toc').classList.contains('on')){closeSheets();return;}
-  if(st.view==='md')render();const t=$('toc'),hs=[...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h=>h.textContent.trim());
-  t.innerHTML=hs.length?hs.map((h,i)=>`<a href="#" data-i="${i}" class="l${h.tagName[1]}">${h.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</a>`).join(''):'<div class="none">No headings yet. Lines starting with # become headings and show up here.</div>';
-  openSheet('toc');$('tocBtn').classList.add('on');
+$('findIn').addEventListener('input', doFind);
+$('findIn').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    goHit(e.shiftKey ? -1 : 1);
+  }
+  if (e.key === 'Escape') toggleFind(false);
+});
+$('findNext').onclick = () => goHit(1);
+$('findPrev').onclick = () => goHit(-1);
+$('replOne').onclick = () => {
+  var q = $('findIn').value;
+  if (!q || !hits.length) return;
+  var p = hits[hitI < 0 ? 0 : hitI];
+  replaceRange(p, p + q.length, $('replIn').value);
+  doFind();
+  hitI = hits.findIndex(h => h >= p);
+  if (hitI < 0) hitI = 0;
+  if (hits.length) goHit(0);else showCount();
 };
-$('toc').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();closeSheets();
-  setView('wyg');[...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h=>h.textContent.trim())[+a.dataset.i]?.scrollIntoView({behavior:'smooth',block:'start'});});
-out.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a)return;e.preventDefault();document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)))?.scrollIntoView({behavior:'smooth'});});
-
-let dlgCancel=null;
-function dialog({title,text,input,buttons}){
-  return new Promise(res=>{
-    $('dlgTitle').textContent=title;$('dlgText').textContent=text||'';const inp=$('dlgIn');inp.hidden=input==null;if(input!=null)inp.value=input;
-    const row=$('dlgBtns');row.innerHTML='';
-    const finish=(b)=>{closeSheets();dlgCancel=null;const val=input!=null?inp.value.trim():null;if(b&&b.run)b.run(val);res(b?b.value??(input!=null?val:true):null);};
-    buttons.forEach(b=>{const el=document.createElement('button');el.className=b.primary?'btnp':'btns';el.textContent=b.label;el.onclick=()=>finish(b.label==='Cancel'?null:b);row.appendChild(el);});
-    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(buttons.find(b=>b.primary));}};
-    dlgCancel=()=>{dlgCancel=null;res(null);};
-    openSheet('dlg');if(input!=null)setTimeout(()=>{inp.focus();inp.select();},60);
+$('replAll').onclick = () => {
+  var q = $('findIn').value;
+  if (!q || !hits.length) return;
+  var n = hits.length;
+  var re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  var nv = src.value.replace(re, () => $('replIn').value);
+  replaceRange(0, src.value.length, nv, 0);
+  doFind();
+  toast(n + ' replaced');
+};
+$('findClose').onclick = () => toggleFind(false);
+var hasPicker = 'showSaveFilePicker' in window && 'showOpenFilePicker' in window;
+var AND = window.Android || null;
+if (AND) document.documentElement.classList.add('app');
+window.padLoad = (t, name, uri, writable) => {
+  _asyncToGenerator(_regenerator().m(function _callee() {
+    var _t;
+    return _regenerator().w(function (_context) {
+      while (1) switch (_context.n) {
+        case 0:
+          _t = st.dirty && src.value.trim() && src.value !== t;
+          if (!_t) {
+            _context.n = 2;
+            break;
+          }
+          _context.n = 1;
+          return confirmDiscard();
+        case 1:
+          _t = !_context.v;
+        case 2:
+          if (!_t) {
+            _context.n = 3;
+            break;
+          }
+          return _context.a(2);
+        case 3:
+          loadText(t, name || 'Untitled.md', null);
+          st.uri = writable ? uri : null;
+          persist(true);
+        case 4:
+          return _context.a(2);
+      }
+    }, _callee);
+  }))();
+};
+window.padSaved = (uri, name) => {
+  st.uri = uri;
+  setName(name);
+  setDirty(false);
+  persist(true);
+  toast('Saved ' + st.name);
+};
+window.padToast = m => toast(m);
+window.padBack = () => {
+  if (document.querySelector('.sheet.on')) {
+    if (dlgCancel) dlgCancel();
+    closeSheets();
+    return true;
+  }
+  if ($('findbar').classList.contains('on')) {
+    toggleFind(false);
+    return true;
+  }
+  persist(true);
+  return false;
+};
+function openFile() {
+  return _openFile.apply(this, arguments);
+}
+function _openFile() {
+  _openFile = _asyncToGenerator(_regenerator().m(function _callee6() {
+    var _yield$showOpenFilePi, _yield$showOpenFilePi2, h, f, _t4, _t5, _t6, _t7;
+    return _regenerator().w(function (_context6) {
+      while (1) switch (_context6.p = _context6.n) {
+        case 0:
+          sync();
+          if (!AND) {
+            _context6.n = 4;
+            break;
+          }
+          _t4 = st.dirty && src.value.trim();
+          if (!_t4) {
+            _context6.n = 2;
+            break;
+          }
+          _context6.n = 1;
+          return confirmDiscard();
+        case 1:
+          _t4 = !_context6.v;
+        case 2:
+          if (!_t4) {
+            _context6.n = 3;
+            break;
+          }
+          return _context6.a(2);
+        case 3:
+          AND.openFile();
+          return _context6.a(2);
+        case 4:
+          _t5 = st.dirty && src.value.trim();
+          if (!_t5) {
+            _context6.n = 6;
+            break;
+          }
+          _context6.n = 5;
+          return confirmDiscard();
+        case 5:
+          _t5 = !_context6.v;
+        case 6:
+          if (!_t5) {
+            _context6.n = 7;
+            break;
+          }
+          return _context6.a(2);
+        case 7:
+          if (!hasPicker) {
+            _context6.n = 14;
+            break;
+          }
+          _context6.p = 8;
+          _context6.n = 9;
+          return showOpenFilePicker({
+            types: [{
+              description: 'Markdown',
+              accept: {
+                'text/markdown': ['.md', '.markdown', '.txt']
+              }
+            }]
+          });
+        case 9:
+          _yield$showOpenFilePi = _context6.v;
+          _yield$showOpenFilePi2 = _slicedToArray(_yield$showOpenFilePi, 1);
+          h = _yield$showOpenFilePi2[0];
+          _context6.n = 10;
+          return h.getFile();
+        case 10:
+          f = _context6.v;
+          _t6 = loadText;
+          _context6.n = 11;
+          return f.text();
+        case 11:
+          _t6(_context6.v, f.name, h);
+          _context6.n = 13;
+          break;
+        case 12:
+          _context6.p = 12;
+          _t7 = _context6.v;
+          if (_t7.name !== 'AbortError') toast('Could not open that file');
+        case 13:
+          return _context6.a(2);
+        case 14:
+          $('fileIn').value = '';
+          $('fileIn').click();
+        case 15:
+          return _context6.a(2);
+      }
+    }, _callee6, null, [[8, 12]]);
+  }));
+  return _openFile.apply(this, arguments);
+}
+$('fileIn').onchange = function () {
+  var _ref2 = _asyncToGenerator(_regenerator().m(function _callee2(e) {
+    var f, t;
+    return _regenerator().w(function (_context2) {
+      while (1) switch (_context2.n) {
+        case 0:
+          f = e.target.files[0];
+          if (f) {
+            _context2.n = 1;
+            break;
+          }
+          return _context2.a(2);
+        case 1:
+          if (!(f.size > 8e6)) {
+            _context2.n = 2;
+            break;
+          }
+          toast('That file is too big to edit here');
+          return _context2.a(2);
+        case 2:
+          _context2.n = 3;
+          return f.text();
+        case 3:
+          t = _context2.v;
+          if (!/\u0000/.test(t.slice(0, 2000))) {
+            _context2.n = 4;
+            break;
+          }
+          toast('That doesn’t look like a text file');
+          return _context2.a(2);
+        case 4:
+          loadText(t, f.name, null);
+        case 5:
+          return _context2.a(2);
+      }
+    }, _callee2);
+  }));
+  return function (_x3) {
+    return _ref2.apply(this, arguments);
+  };
+}();
+function loadText(t, name, handle) {
+  richDirty = false;
+  st.uri = null;
+  src.value = t.replace(/\r\n?/g, '\n');
+  setName(name);
+  st.handle = handle;
+  setDirty(false);
+  persist(true);
+  render();
+  src.setSelectionRange(0, 0);
+  src.scrollTop = 0;
+  readPane.scrollTop = 0;
+  toast('Opened ' + st.name);
+}
+function blob() {
+  return new Blob([src.value], {
+    type: 'text/markdown;charset=utf-8'
   });
 }
-const askName=(t,txt)=>dialog({title:t,text:txt,input:st.name,buttons:[{label:'Cancel'},{label:'OK',primary:true}]}).then(v=>v==null||v===''?null:v);
-const confirmDiscard=()=>dialog({title:'Replace this document?',text:'“'+st.name+'” has changes that haven’t been saved to a file. Save first if you want to keep them.',
-  buttons:[{label:'Cancel'},{label:'Replace it',primary:true,value:true}]}).then(v=>!!v);
-
-const HELP=`# Markdown cheat sheet
+function download(b, name) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 1500);
+}
+function save(_x4) {
+  return _save.apply(this, arguments);
+}
+function _save() {
+  _save = _asyncToGenerator(_regenerator().m(function _callee7(asNew) {
+    var n, w, _n, _t8;
+    return _regenerator().w(function (_context7) {
+      while (1) switch (_context7.p = _context7.n) {
+        case 0:
+          sync();
+          if (!AND) {
+            _context7.n = 6;
+            break;
+          }
+          if (!(st.uri && !asNew)) {
+            _context7.n = 1;
+            break;
+          }
+          AND.saveTo(st.uri, src.value, st.name);
+          _context7.n = 5;
+          break;
+        case 1:
+          if (!asNew) {
+            _context7.n = 4;
+            break;
+          }
+          _context7.n = 2;
+          return askName('Save as', 'Choose where to save it on the next screen.');
+        case 2:
+          n = _context7.v;
+          if (!(n == null)) {
+            _context7.n = 3;
+            break;
+          }
+          return _context7.a(2);
+        case 3:
+          setName(n);
+        case 4:
+          AND.saveAs(st.name, src.value, 'text/markdown', true);
+        case 5:
+          return _context7.a(2);
+        case 6:
+          if (!hasPicker) {
+            _context7.n = 15;
+            break;
+          }
+          _context7.p = 7;
+          if (!(!st.handle || asNew)) {
+            _context7.n = 9;
+            break;
+          }
+          _context7.n = 8;
+          return showSaveFilePicker({
+            suggestedName: st.name,
+            types: [{
+              description: 'Markdown',
+              accept: {
+                'text/markdown': ['.md']
+              }
+            }]
+          });
+        case 8:
+          st.handle = _context7.v;
+        case 9:
+          _context7.n = 10;
+          return st.handle.createWritable();
+        case 10:
+          w = _context7.v;
+          _context7.n = 11;
+          return w.write(blob());
+        case 11:
+          _context7.n = 12;
+          return w.close();
+        case 12:
+          setName(st.handle.name);
+          setDirty(false);
+          persist(true);
+          toast('Saved ' + st.name);
+          return _context7.a(2);
+        case 13:
+          _context7.p = 13;
+          _t8 = _context7.v;
+          if (!(_t8.name === 'AbortError')) {
+            _context7.n = 14;
+            break;
+          }
+          return _context7.a(2);
+        case 14:
+          st.handle = null;
+        case 15:
+          if (!(asNew || st.name === 'Untitled.md')) {
+            _context7.n = 18;
+            break;
+          }
+          _context7.n = 16;
+          return askName('Save as', 'The file goes to your Downloads folder. Use Share to send it to OneDrive, Google Drive or another app.');
+        case 16:
+          _n = _context7.v;
+          if (!(_n == null)) {
+            _context7.n = 17;
+            break;
+          }
+          return _context7.a(2);
+        case 17:
+          setName(_n);
+        case 18:
+          download(blob(), st.name);
+          setDirty(false);
+          persist(true);
+          toast('Saved to Downloads as ' + st.name);
+        case 19:
+          return _context7.a(2);
+      }
+    }, _callee7, null, [[7, 13]]);
+  }));
+  return _save.apply(this, arguments);
+}
+function share() {
+  return _share.apply(this, arguments);
+}
+function _share() {
+  _share = _asyncToGenerator(_regenerator().m(function _callee8() {
+    var _navigator$clipboard;
+    var file, _t9;
+    return _regenerator().w(function (_context8) {
+      while (1) switch (_context8.p = _context8.n) {
+        case 0:
+          sync();
+          if (!AND) {
+            _context8.n = 1;
+            break;
+          }
+          AND.share(st.name, src.value);
+          return _context8.a(2);
+        case 1:
+          file = new File([src.value], st.name, {
+            type: 'text/plain'
+          });
+          _context8.p = 2;
+          if (!(navigator.canShare && navigator.canShare({
+            files: [file]
+          }))) {
+            _context8.n = 4;
+            break;
+          }
+          _context8.n = 3;
+          return navigator.share({
+            files: [file],
+            title: st.name
+          });
+        case 3:
+          return _context8.a(2);
+        case 4:
+          if (!navigator.share) {
+            _context8.n = 6;
+            break;
+          }
+          _context8.n = 5;
+          return navigator.share({
+            title: st.name,
+            text: src.value
+          });
+        case 5:
+          return _context8.a(2);
+        case 6:
+          _context8.n = 8;
+          break;
+        case 7:
+          _context8.p = 7;
+          _t9 = _context8.v;
+          if (!(_t9.name === 'AbortError')) {
+            _context8.n = 8;
+            break;
+          }
+          return _context8.a(2);
+        case 8:
+          _context8.n = 9;
+          return (_navigator$clipboard = navigator.clipboard) === null || _navigator$clipboard === void 0 ? void 0 : _navigator$clipboard.writeText(src.value);
+        case 9:
+          toast('Sharing isn’t available here, so the text was copied instead');
+        case 10:
+          return _context8.a(2);
+      }
+    }, _callee8, null, [[2, 7]]);
+  }));
+  return _share.apply(this, arguments);
+}
+function exportHtml() {
+  sync();
+  var r = MD.render(src.value),
+    title = st.name.replace(/\.(md|markdown|txt)$/i, '');
+  var css = [...document.styleSheets[0].cssRules].map(x => x.cssText).filter(t => /^(:root|\.md|@page|@media \(prefers)/.test(t)).join('\n');
+  var html = `<!DOCTYPE html><html lang="en-NZ"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/</g, '&lt;')}</title><style>${css}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}.md{padding:28px 24px 60px}</style></head><body><article class="md">${r.html}</article></body></html>`;
+  if (AND) {
+    AND.saveAs(title + '.html', html, 'text/html', false);
+    return;
+  }
+  download(new Blob([html], {
+    type: 'text/html;charset=utf-8'
+  }), title + '.html');
+  toast('Downloaded ' + title + '.html');
+}
+function newDoc() {
+  _asyncToGenerator(_regenerator().m(function _callee3() {
+    var _t2;
+    return _regenerator().w(function (_context3) {
+      while (1) switch (_context3.n) {
+        case 0:
+          _t2 = st.dirty && src.value.trim();
+          if (!_t2) {
+            _context3.n = 2;
+            break;
+          }
+          _context3.n = 1;
+          return confirmDiscard();
+        case 1:
+          _t2 = !_context3.v;
+        case 2:
+          if (!_t2) {
+            _context3.n = 3;
+            break;
+          }
+          return _context3.a(2);
+        case 3:
+          src.value = '';
+          setName('Untitled.md');
+          st.handle = null;
+          st.uri = null;
+          setDirty(false);
+          persist(true);
+          render();
+          if (!st.lock) (st.view === 'md' ? src : out).focus();
+          toast('New document ready, start typing');
+        case 4:
+          return _context3.a(2);
+      }
+    }, _callee3);
+  }))();
+}
+$('openBtn').onclick = openFile;
+$('saveBtn').onclick = () => save(false);
+$('shareBtn').onclick = share;
+$('nameBtn').onclick = _asyncToGenerator(_regenerator().m(function _callee4() {
+  var n;
+  return _regenerator().w(function (_context4) {
+    while (1) switch (_context4.n) {
+      case 0:
+        _context4.n = 1;
+        return askName('Rename', 'This changes the name used next time you save.');
+      case 1:
+        n = _context4.v;
+        if (n != null) {
+          setName(n);
+          persist();
+        }
+      case 2:
+        return _context4.a(2);
+    }
+  }, _callee4);
+}));
+document.addEventListener('keydown', e => {
+  var mod = e.ctrlKey || e.metaKey,
+    k = e.key.toLowerCase();
+  if (mod && k === 's') {
+    e.preventDefault();
+    save(e.shiftKey);
+  } else if (mod && k === 'o') {
+    e.preventDefault();
+    openFile();
+  } else if (mod && k === 'p') {
+    e.preventDefault();
+    doPrint();
+  } else if (e.key === 'Escape') {
+    closeSheets();
+  }
+});
+window.addEventListener('beforeunload', () => persist(true));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) persist(true);
+});
+function doPrint() {
+  sync();
+  var v = st.view;
+  if (v === 'md') {
+    render();
+    readPane.classList.remove('hide');
+  }
+  setTimeout(() => {
+    if (AND) AND.print(st.name.replace(/\.(md|markdown|txt)$/i, ''));else window.print();
+    if (v === 'md') readPane.classList.add('hide');
+  }, 50);
+}
+function closeSheets() {
+  document.querySelectorAll('.sheet.on').forEach(s => s.classList.remove('on'));
+  $('scrim').classList.remove('on');
+  $('menuBtn').classList.remove('on');
+  $('tocBtn').classList.remove('on');
+}
+function openSheet(id) {
+  closeSheets();
+  $(id).classList.add('on');
+  $('scrim').classList.add('on');
+}
+$('scrim').onclick = () => {
+  if (dlgCancel) dlgCancel();
+  closeSheets();
+};
+$('menuBtn').onclick = () => {
+  var on = $('menu').classList.contains('on');
+  closeSheets();
+  if (!on) {
+    openSheet('menu');
+    $('menuBtn').classList.add('on');
+  }
+};
+$('menu').addEventListener('click', e => {
+  var b = e.target.closest('[data-m]');
+  if (!b) return;
+  closeSheets();
+  ({
+    new: newDoc,
+    saveas: () => save(true),
+    copy: function () {
+      var _copy = _asyncToGenerator(_regenerator().m(function _callee5() {
+        var _t3;
+        return _regenerator().w(function (_context5) {
+          while (1) switch (_context5.p = _context5.n) {
+            case 0:
+              sync();
+              _context5.p = 1;
+              _context5.n = 2;
+              return navigator.clipboard.writeText(src.value);
+            case 2:
+              toast('Markdown copied');
+              _context5.n = 4;
+              break;
+            case 3:
+              _context5.p = 3;
+              _t3 = _context5.v;
+              src.select();
+              document.execCommand('copy');
+              toast('Markdown copied');
+            case 4:
+              return _context5.a(2);
+          }
+        }, _callee5, null, [[1, 3]]);
+      }));
+      function copy() {
+        return _copy.apply(this, arguments);
+      }
+      return copy;
+    }(),
+    copyhtml: exportHtml,
+    print: doPrint,
+    help: showHelp
+  })[b.dataset.m]();
+});
+$('tocBtn').onclick = () => {
+  if ($('toc').classList.contains('on')) {
+    closeSheets();
+    return;
+  }
+  if (st.view === 'md') render();
+  var t = $('toc'),
+    hs = [...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => h.textContent.trim());
+  t.innerHTML = hs.length ? hs.map((h, i) => `<a href="#" data-i="${i}" class="l${h.tagName[1]}">${h.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</a>`).join('') : '<div class="none">No headings yet. Lines starting with # become headings and show up here.</div>';
+  openSheet('toc');
+  $('tocBtn').classList.add('on');
+};
+$('toc').addEventListener('click', e => {
+  var _filter$a$dataset$i;
+  var a = e.target.closest('a');
+  if (!a) return;
+  e.preventDefault();
+  closeSheets();
+  setView('wyg');
+  (_filter$a$dataset$i = [...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => h.textContent.trim())[+a.dataset.i]) === null || _filter$a$dataset$i === void 0 || _filter$a$dataset$i.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+});
+out.addEventListener('click', e => {
+  var _document$getElementB2;
+  var a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  (_document$getElementB2 = document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)))) === null || _document$getElementB2 === void 0 || _document$getElementB2.scrollIntoView({
+    behavior: 'smooth'
+  });
+});
+var dlgCancel = null;
+function dialog({
+  title,
+  text,
+  input,
+  buttons
+}) {
+  return new Promise(res => {
+    $('dlgTitle').textContent = title;
+    $('dlgText').textContent = text || '';
+    var inp = $('dlgIn');
+    inp.hidden = input == null;
+    if (input != null) inp.value = input;
+    var row = $('dlgBtns');
+    row.innerHTML = '';
+    var finish = b => {
+      var _b$value;
+      closeSheets();
+      dlgCancel = null;
+      var val = input != null ? inp.value.trim() : null;
+      if (b && b.run) b.run(val);
+      res(b ? (_b$value = b.value) !== null && _b$value !== void 0 ? _b$value : input != null ? val : true : null);
+    };
+    buttons.forEach(b => {
+      var el = document.createElement('button');
+      el.className = b.primary ? 'btnp' : 'btns';
+      el.textContent = b.label;
+      el.onclick = () => finish(b.label === 'Cancel' ? null : b);
+      row.appendChild(el);
+    });
+    inp.onkeydown = e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(buttons.find(b => b.primary));
+      }
+    };
+    dlgCancel = () => {
+      dlgCancel = null;
+      res(null);
+    };
+    openSheet('dlg');
+    if (input != null) setTimeout(() => {
+      inp.focus();
+      inp.select();
+    }, 60);
+  });
+}
+var askName = (t, txt) => dialog({
+  title: t,
+  text: txt,
+  input: st.name,
+  buttons: [{
+    label: 'Cancel'
+  }, {
+    label: 'OK',
+    primary: true
+  }]
+}).then(v => v == null || v === '' ? null : v);
+var confirmDiscard = () => dialog({
+  title: 'Replace this document?',
+  text: '“' + st.name + '” has changes that haven’t been saved to a file. Save first if you want to keep them.',
+  buttons: [{
+    label: 'Cancel'
+  }, {
+    label: 'Replace it',
+    primary: true,
+    value: true
+  }]
+}).then(v => !!v);
+var HELP = `# Markdown cheat sheet
 
 Markdown is plain text with a few symbols that turn into formatting. **WYG** shows the formatted page and you can type straight onto it. **MD** shows the plain Markdown text. The buttons work in both.
 
@@ -989,18 +2414,25 @@ Markdown is plain text with a few symbols that turn into formatting. **WYG** sho
 - In the padMD app, **Save** writes straight back to the file you opened, and **Save as** lets you pick a folder. In a web browser, **Save** puts the file in Downloads instead.
 - **Share** sends the text straight to OneDrive, Google Drive, email or another app.
 - **Print** (in the ⋮ menu) makes an A4 page, and you can choose *Save as PDF* there.`;
-function showHelp(){$('helpBody').innerHTML=MD.render(HELP).html;openSheet('help');}
-$('helpClose').onclick=closeSheets;
-
-/* ════════════════════════════════════════════════════════════
-   Start up
-   ════════════════════════════════════════════════════════════ */
-const had=loadState();
-setName(st.name);setDirty(st.dirty);if(!st.dirty)status(had?'Ready':'Ready');
+function showHelp() {
+  $('helpBody').innerHTML = MD.render(HELP).html;
+  openSheet('help');
+}
+$('helpClose').onclick = closeSheets;
+var had = loadState();
+setName(st.name);
+setDirty(st.dirty);
+if (!st.dirty) status(had ? 'Ready' : 'Ready');
 applyLook();
-try{document.execCommand('defaultParagraphSeparator',false,'p');}catch(e){}
-st.view=st.view==='md'?'md':'wyg';const startView=st.view;st.view=null;setView(startView);render();
-if(had&&st.dirty)status('Unsaved draft brought back','warn');
+try {
+  document.execCommand('defaultParagraphSeparator', false, 'p');
+} catch (e) {}
+st.view = st.view === 'md' ? 'md' : 'wyg';
+var startView = st.view;
+st.view = null;
+setView(startView);
+render();
+if (had && st.dirty) status('Unsaved draft brought back', 'warn');
 </script>
 </body>
 </html>

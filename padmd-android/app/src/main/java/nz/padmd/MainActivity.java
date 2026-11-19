@@ -66,7 +66,16 @@ public class MainActivity extends Activity {
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-                Uri u = req.getUrl();
+                return openOutside(req.getUrl());
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return openOutside(Uri.parse(url));
+            }
+
+            private boolean openOutside(Uri u) {
                 String scheme = u.getScheme();
                 if ("http".equals(scheme) || "https".equals(scheme) || "mailto".equals(scheme) || "tel".equals(scheme)) {
                     try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) { }

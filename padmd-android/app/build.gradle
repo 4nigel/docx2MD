@@ -5,7 +5,7 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId 'nz.padmd'
-        minSdk 26
+        minSdk 21
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
         versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
@@ -19,6 +19,9 @@ android {
                 keyAlias System.getenv('PADMD_KEY_ALIAS') ?: 'padmd'
                 keyPassword System.getenv('PADMD_KEYSTORE_PASSWORD')
             }
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
         }
     }
     buildTypes {

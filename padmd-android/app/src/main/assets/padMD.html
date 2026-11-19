@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<title>padMD</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#191b1d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Lightweight Markdown creator, editor and viewer for touch tablets. Works offline.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23191b1d'/%3E%3Crect x='8' y='8' width='48' height='48' rx='6' fill='none' stroke='%23e8a020' stroke-width='4'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='22' fill='%23e8a020' text-anchor='middle'%3EMD%3C/text%3E%3C/svg%3E">
+<style>
+/* ── Colour tokens (dark is the default, light follows the tablet setting or the toggle) ── */
+:root{
+  --bg:#191b1d;--surface:#212426;--surface2:#292c2f;--border:#333639;--border2:#44484c;
+  --accent:#e8a020;--accent-lo:rgba(232,160,32,.14);--text:#d8dadc;--text-dim:#8a8f95;--text-lo:#5a5e63;
+  --ok:#4caf82;--warn:#d97c3a;--code-bg:#15171a;--mark:rgba(232,160,32,.35);
+  --mono:ui-monospace,"Roboto Mono","Droid Sans Mono","SamsungOneUI",Menlo,Consolas,monospace;
+  --sans:"Samsung Sans","SamsungOne",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Noto Serif",Georgia,"Times New Roman",serif;
+  --fs:17px;--tap:44px;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f6f5f2;--surface:#ffffff;--surface2:#efeee9;--border:#dddbd5;--border2:#c7c4bc;
+  --accent:#b36f00;--accent-lo:rgba(179,111,0,.10);--text:#22252a;--text-dim:#5f646b;--text-lo:#9a9ea4;
+  --ok:#2e8a5c;--warn:#b5561a;--code-bg:#f0eee8;--mark:rgba(240,184,64,.45);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]):not([data-theme="light"]){
+    --bg:#f6f5f2;--surface:#ffffff;--surface2:#efeee9;--border:#dddbd5;--border2:#c7c4bc;
+    --accent:#b36f00;--accent-lo:rgba(179,111,0,.10);--text:#22252a;--text-dim:#5f646b;--text-lo:#9a9ea4;
+    --ok:#2e8a5c;--warn:#b5561a;--code-bg:#f0eee8;--mark:rgba(240,184,64,.45);
+    color-scheme:light;
+  }
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);font-size:15px;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;touch-action:manipulation}
+svg{display:block}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;gap:6px;padding:0 8px;min-height:56px;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.logo{width:34px;height:34px;border:2px solid var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:12px;color:var(--accent);letter-spacing:.02em;flex-shrink:0;margin:0 4px}
+.docname{display:flex;align-items:center;gap:6px;min-width:0;flex:1;padding:6px 8px;border-radius:8px}
+.docname:active{background:var(--surface2)}
+.docname span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:15px}
+.dirty{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;visibility:hidden}
+.dirty.on{visibility:visible}
+.hbtn{min-width:var(--tap);height:var(--tap);border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;color:var(--text);font-size:14px;font-weight:500}
+.hbtn:active,.hbtn.on{background:var(--accent-lo);color:var(--accent)}
+.hbtn .lbl{display:none}
+@media (min-width:900px){.hbtn .lbl{display:inline}}
+.seg{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:2px;flex-shrink:0}
+.seg button{height:38px;padding:0 14px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim)}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.seg button.hide{display:none}
+
+/* ── Format bar ── */
+.fmtbar{
+  display:flex;gap:4px;padding:6px 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.fmtbar::-webkit-scrollbar{display:none}
+.fmtbar.hide{display:none}
+.fb{min-width:var(--tap);height:var(--tap);padding:0 10px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap;flex-shrink:0}
+.fb:active{border-color:var(--accent);color:var(--accent);background:var(--accent-lo)}
+.fb.mono{font-family:var(--mono);font-size:13px}
+.fsep{width:1px;background:var(--border);margin:6px 4px;flex-shrink:0}
+
+/* ── Find bar ── */
+.findbar{display:none;gap:6px;padding:6px 8px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0}
+.findbar.on{display:flex}
+.findbar input{flex:1 1 160px;height:40px;border-radius:9px;border:1px solid var(--border2);background:var(--bg);color:var(--text);padding:0 10px;font-size:15px;min-width:0}
+.findbar input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.findbar .cnt{font-size:13px;color:var(--text-dim);min-width:56px;text-align:center}
+
+/* ── Panes ── */
+main{flex:1;display:flex;min-height:0;position:relative}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.pane.hide{display:none}
+#editPane{border-right:1px solid var(--border)}
+main.single #editPane{border-right:none}
+textarea#src{
+  flex:1;width:100%;resize:none;border:none;outline:none;background:var(--bg);color:var(--text);
+  font-family:var(--mono);font-size:calc(var(--fs) - 1px);line-height:1.65;padding:18px 20px 40vh;
+  tab-size:4;caret-color:var(--accent);
+}
+body.sansedit textarea#src{font-family:var(--sans);font-size:var(--fs)}
+textarea#src::placeholder{color:var(--text-lo)}
+#readPane{overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch}
+#out{width:100%;position:relative;outline:none;caret-color:var(--accent);min-height:60vh}
+#out.isempty::before{content:"Start writing… type # and a space for a heading, - and a space for a list.";color:var(--text-lo);position:absolute;pointer-events:none;left:26px;right:26px}
+#out.isempty>*{min-height:1.7em}
+#out[contenteditable=true] a{cursor:text}
+
+/* ── Rendered Markdown ── */
+.md{max-width:820px;margin:0 auto;padding:22px 26px 30vh;font-size:var(--fs);line-height:1.7;word-wrap:break-word}
+body.serif .md{font-family:var(--serif)}
+.md>*:first-child{margin-top:0}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-family:var(--sans);line-height:1.3;margin:1.4em 0 .5em;font-weight:650;scroll-margin-top:12px}
+.md h1{font-size:1.85em;border-bottom:2px solid var(--accent);padding-bottom:.25em}
+.md h2{font-size:1.45em;border-bottom:1px solid var(--border);padding-bottom:.2em}
+.md h3{font-size:1.2em}.md h4{font-size:1.05em}.md h5,.md h6{font-size:.95em;color:var(--text-dim)}
+.md p,.md ul,.md ol,.md blockquote,.md pre,.md table{margin:0 0 1em}
+.md ul,.md ol{padding-left:1.6em}
+.md li{margin:.2em 0}
+.md li>ul,.md li>ol{margin:.2em 0}
+.md li>p{margin:0 0 .4em}
+.md li.task{list-style:none;margin-left:-1.4em}
+.md li.task>input{width:1.15em;height:1.15em;margin-right:.5em;vertical-align:-.15em;accent-color:var(--accent);cursor:pointer}
+.md li.task.done>.tt{color:var(--text-dim);text-decoration:line-through}
+.md a{color:var(--accent);text-underline-offset:2px}
+.md code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);border:1px solid var(--border);border-radius:5px;padding:.08em .35em}
+.md pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.5}
+.md pre code{background:none;border:none;padding:0;font-size:.85em}
+.md blockquote{border-left:4px solid var(--accent);background:var(--accent-lo);padding:.6em 1em;border-radius:0 8px 8px 0;color:var(--text)}
+.md blockquote>*:last-child{margin-bottom:0}
+.md hr{border:none;border-top:2px solid var(--border);margin:1.8em 0}
+.md img{max-width:100%;height:auto;border-radius:6px}
+.md mark{background:var(--mark);color:inherit;padding:0 .15em;border-radius:3px}
+.md .tblwrap{overflow-x:auto;margin:0 0 1em}
+.md table{border-collapse:collapse;min-width:50%;font-size:.93em;margin:0}
+.md th,.md td{border:1px solid var(--border2);padding:.45em .75em;vertical-align:top}
+.md th{background:var(--surface2);font-family:var(--sans);font-weight:600}
+.md tr:nth-child(even) td{background:color-mix(in srgb,var(--surface2) 45%,transparent)}
+.empty{color:var(--text-dim);text-align:center;padding:12vh 20px;font-family:var(--sans)}
+.empty h2{border:none;color:var(--text);font-size:1.4em;margin-bottom:.5em}
+.empty .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:1.4em}
+.btnp{height:var(--tap);padding:0 18px;border-radius:10px;border:1px solid var(--accent);color:var(--accent);background:var(--accent-lo);font-weight:600}
+.btns{height:var(--tap);padding:0 18px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);font-weight:500}
+
+/* ── Footer ── */
+footer{display:flex;gap:14px;align-items:center;padding:0 14px calc(env(safe-area-inset-bottom));min-height:30px;font-size:12.5px;color:var(--text-dim);
+  background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;white-space:nowrap;overflow:hidden}
+footer .sp{flex:1}
+#status.ok{color:var(--ok)}#status.warn{color:var(--warn)}
+
+/* ── Sheets (menus and dialogs) ── */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:50}
+.scrim.on{display:block}
+.sheet{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.4);
+  display:none;flex-direction:column;max-height:80dvh;overflow-y:auto}
+.sheet.on{display:flex}
+.menu{top:60px;right:8px;width:290px;padding:6px}
+.menu button,.toc a{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 14px;border-radius:9px;text-align:left;width:100%;font-size:15px}
+.menu button:active,.toc a:active{background:var(--accent-lo);color:var(--accent)}
+.menu .msep{height:1px;background:var(--border);margin:6px 8px}
+.menu .mrow{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 14px;min-height:46px;font-size:15px}
+.menu .mrow span{flex:1}
+.menu .mrow .seg button{height:34px;padding:0 10px;font-size:13px}
+.toc{top:60px;left:8px;width:min(380px,calc(100vw - 16px));padding:6px}
+.toc a{color:var(--text);text-decoration:none;min-height:42px;font-size:14.5px}
+.toc a.l1{font-weight:650}.toc a.l3{padding-left:30px;color:var(--text-dim)}.toc a.l4,.toc a.l5,.toc a.l6{padding-left:44px;color:var(--text-dim);font-size:13.5px}
+.toc .none{padding:14px;color:var(--text-dim)}
+.dlg{left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 32px));padding:20px;gap:12px}
+.dlg h3{font-size:17px}
+.dlg p{color:var(--text-dim);font-size:14px;line-height:1.5}
+.dlg input{height:46px;border-radius:9px;border:1px solid var(--border2);background:var(--bg);color:var(--text);padding:0 12px;font-size:16px;width:100%}
+.dlg .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.help{width:min(620px,calc(100vw - 32px))}
+.help .md{padding:0;font-size:15px;max-width:none}
+.help .md p{color:var(--text);font-size:inherit}
+.toast{position:fixed;left:50%;bottom:48px;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);padding:10px 18px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:80;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Print: A4, reading view only ── */
+@page{size:A4;margin:18mm 16mm}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--surface2:#f1f1f1;--border:#ccc;--border2:#bbb;--text:#111;--text-dim:#555;--accent:#8a5500;--accent-lo:#f7efe0;--code-bg:#f5f5f5;color-scheme:light}
+  body{height:auto;overflow:visible;display:block;background:#fff}
+  header,.fmtbar,.findbar,footer,#editPane,.sheet,.scrim,.toast{display:none!important}
+  main{display:block}
+  #readPane{display:block!important;overflow:visible}
+  .md{padding:0;max-width:none;font-size:11pt}
+  .md pre,.md table,.md img,.md blockquote{break-inside:avoid}
+  .md h1,.md h2,.md h3{break-after:avoid}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" aria-hidden="true">MD</div>
+  <button class="docname" id="nameBtn" title="Rename"><span id="docName">Untitled.md</span><i class="dirty" id="dirty"></i></button>
+  <div class="seg" id="viewSeg" role="tablist" aria-label="Mode">
+    <button data-view="wyg" title="Type on the formatted page">WYG</button>
+    <button data-view="md" title="Edit the Markdown text">MD</button>
+  </div>
+  <button class="hbtn" id="tocBtn" title="Contents">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+    <span class="lbl">Contents</span></button>
+  <button class="hbtn" id="openBtn" title="Open a file">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <span class="lbl">Open</span></button>
+  <button class="hbtn" id="saveBtn" title="Save (Ctrl+S)">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v6h8V3"/><rect x="7" y="13" width="10" height="8"/></svg>
+    <span class="lbl">Save</span></button>
+  <button class="hbtn" id="shareBtn" title="Share or send to another app">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
+    <span class="lbl">Share</span></button>
+  <button class="hbtn" id="menuBtn" title="More">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+</header>
+
+<div class="fmtbar" id="fmtbar">
+  <button class="fb" data-a="undo" title="Undo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+  <button class="fb" data-a="redo" title="Redo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+  <div class="fsep"></div>
+  <button class="fb" data-a="h1" title="Heading 1"><b>H1</b></button>
+  <button class="fb" data-a="h2" title="Heading 2"><b>H2</b></button>
+  <button class="fb" data-a="h3" title="Heading 3"><b>H3</b></button>
+  <div class="fsep"></div>
+  <button class="fb" data-a="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+  <button class="fb" data-a="italic" title="Italic (Ctrl+I)"><i style="font-family:var(--serif)">I</i></button>
+  <button class="fb" data-a="strike" title="Strikethrough"><s>S</s></button>
+  <button class="fb" data-a="mark" title="Highlight"><span style="background:var(--mark);padding:0 4px;border-radius:3px">H</span></button>
+  <div class="fsep"></div>
+  <button class="fb" data-a="ul" title="Bullet list">• List</button>
+  <button class="fb" data-a="ol" title="Numbered list">1. List</button>
+  <button class="fb" data-a="task" title="Checklist item">☐ Task</button>
+  <button class="fb" data-a="outdent" title="Move left">⇤</button>
+  <button class="fb" data-a="indent" title="Move right">⇥</button>
+  <div class="fsep"></div>
+  <button class="fb" data-a="quote" title="Quote">❝ Quote</button>
+  <button class="fb" data-a="link" title="Link">🔗 Link</button>
+  <button class="fb" data-a="image" title="Picture from a web address">🖼 Image</button>
+  <button class="fb" data-a="table" title="Table">▦ Table</button>
+  <button class="fb mono" data-a="code" title="Inline code">`code`</button>
+  <button class="fb mono" data-a="codeblock" title="Code block">```</button>
+  <button class="fb" data-a="hr" title="Dividing line">— Line</button>
+  <button class="fb" data-a="date" title="Insert today's date">📅 Date</button>
+  <div class="fsep"></div>
+  <button class="fb" data-a="find" title="Find and replace (Ctrl+F)">🔍 Find</button>
+</div>
+
+<div class="findbar" id="findbar">
+  <input id="findIn" placeholder="Find" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+  <input id="replIn" placeholder="Replace with" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <span class="cnt" id="findCnt"></span>
+  <button class="fb" id="findPrev" title="Previous">↑</button>
+  <button class="fb" id="findNext" title="Next">↓</button>
+  <button class="fb" id="replOne">Replace</button>
+  <button class="fb" id="replAll">All</button>
+  <button class="fb" id="findClose" title="Close">✕</button>
+</div>
+
+<main id="main">
+  <section class="pane" id="editPane">
+    <textarea id="src" spellcheck="true" autocapitalize="sentences" autocomplete="off" placeholder="Start writing Markdown here…"></textarea>
+  </section>
+  <section class="pane" id="readPane"><article class="md" id="out" spellcheck="true" autocapitalize="sentences"></article></section>
+</main>
+
+<footer>
+  <span id="status">Ready</span><span class="sp"></span>
+  <span id="wc">0 words</span><span id="rt"></span>
+</footer>
+
+<input type="file" id="fileIn" hidden>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet menu" id="menu">
+  <button data-m="new">📄&nbsp; New document</button>
+  <button data-m="saveas">💾&nbsp; Save as…</button>
+  <button data-m="copy">📋&nbsp; Copy all Markdown</button>
+  <button data-m="copyhtml">🌐&nbsp; Download as web page (.html)</button>
+  <button data-m="print">🖨&nbsp; Print or save as PDF (A4)</button>
+  <div class="msep"></div>
+  <div class="mrow"><span>WYG typing</span><div class="seg" id="lockSeg"><button data-v="off">On</button><button data-v="on">Read only</button></div></div>
+  <div class="mrow"><span>Theme</span><div class="seg" id="themeSeg"><button data-v="auto">Auto</button><button data-v="dark">Dark</button><button data-v="light">Light</button></div></div>
+  <div class="mrow"><span>Text size</span><div class="seg"><button id="fsDown">A−</button><button id="fsUp">A+</button></div></div>
+  <div class="mrow"><span>Reading font</span><div class="seg" id="fontSeg"><button data-v="sans">Plain</button><button data-v="serif">Book</button></div></div>
+  <div class="mrow"><span>Editor font</span><div class="seg" id="efontSeg"><button data-v="mono">Code</button><button data-v="sans">Plain</button></div></div>
+  <div class="msep"></div>
+  <button data-m="help">❔&nbsp; Markdown cheat sheet</button>
+</div>
+
+<div class="sheet toc" id="toc"></div>
+
+<div class="sheet dlg" id="dlg">
+  <h3 id="dlgTitle"></h3>
+  <p id="dlgText"></p>
+  <input id="dlgIn" hidden>
+  <div class="row" id="dlgBtns"></div>
+</div>
+
+<div class="sheet dlg help" id="help"><article class="md" id="helpBody"></article>
+  <div class="row" style="display:flex;justify-content:flex-end"><button class="btnp" id="helpClose">Close</button></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════
+   Markdown renderer (built in, no internet needed)
+   Handles: headings, paragraphs, bold/italic/strike/highlight,
+   links, images, code, quotes, nested and numbered lists,
+   checklists, tables, dividing lines and simple HTML.
+   ════════════════════════════════════════════════════════════ */
+const MD=(()=>{
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const safeUrl=u=>{u=u.trim().replace(/^<|>$/g,'');return /^\s*(javascript|vbscript|data:text\/html)/i.test(u)?'#':u;};
+  const slug=t=>t.toLowerCase().replace(/<[^>]+>/g,'').replace(/&[a-z#0-9]+;/g,'').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'section';
+  let toc=[],slugs={},taskN=0;
+
+  function inline(t){
+    const store=[];const put=h=>'\u0001'+(store.push(h)-1)+'\u0002';
+    t=t.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g,(_,f,c)=>put('<code>'+esc(c.replace(/^ (.*) $/,'$1'))+'</code>'));
+    t=t.replace(/\\([\\`*_{}\[\]()#+\-.!|~=>])/g,(_,c)=>put(esc(c)));
+    t=t.replace(/<(https?:\/\/[^>\s]+)>/g,(_,u)=>put(`<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(u)}</a>`));
+    t=t.replace(/!\[([^\]]*)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g,(_,a,s,ti)=>
+      put(`<img src="${esc(safeUrl(s))}" alt="${esc(a)}"${ti?` title="${esc(ti)}"`:''} loading="lazy">`));
+    t=t.replace(/\[([^\]]+)\]\(\s*(<[^>]*>|[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g,(_,l,h,ti)=>
+      put(`<a href="${esc(safeUrl(h))}"${ti?` title="${esc(ti)}"`:''}${/^#/.test(h)?'':' target="_blank" rel="noopener"'}>`)+l+put('</a>'));
+    t=esc(t);
+    t=t.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g,(_,p,u)=>p+put(`<a href="${u}" target="_blank" rel="noopener">${u}</a>`));
+    t=t.replace(/\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/g,'<strong><em>$1</em></strong>')
+       .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g,'<strong>$1</strong>')
+       .replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__(?!\w)/g,'$1<strong>$2</strong>')
+       .replace(/\*(?=[^\s*])([\s\S]*?[^\s*])\*/g,'<em>$1</em>')
+       .replace(/(^|[^\w])_(?=[^\s_])([\s\S]*?[^\s_])_(?!\w)/g,'$1<em>$2</em>')
+       .replace(/~~(?=\S)([\s\S]*?\S)~~/g,'<del>$1</del>')
+       .replace(/==(?=\S)([\s\S]*?\S)==/g,'<mark>$1</mark>')
+       .replace(/( {2,}|\\)\n/g,'<br>\n');
+    for(let k=0;k<4&&/\u0001\d+\u0002/.test(t);k++)t=t.replace(/\u0001(\d+)\u0002/g,(_,n)=>store[n]);
+    return t;
+  }
+
+  const reFence=/^ {0,3}(`{3,}|~{3,})(.*)$/, reHead=/^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$/,
+        reHr=/^ {0,3}([-*_])(\s*\1){2,}\s*$/, reQuote=/^ {0,3}>\s?/,
+        reLi=/^( *)([-*+]|\d{1,9}[.)])\s+(.*)$/, reLiEmpty=/^( *)([-*+]|\d{1,9}[.)])\s*$/,
+        reHtml=/^ {0,3}<\/?(div|p|table|thead|tbody|tr|td|th|ul|ol|li|h[1-6]|pre|blockquote|details|summary|figure|figcaption|section|article|aside|header|footer|nav|hr|br|img|center|dl|dt|dd|!--)/i,
+        reTblSep=/^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
+  const indentOf=l=>l.match(/^ */)[0].length;
+  const cleanHtml=h=>h.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,'').replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi,'$1="#"');
+  const cells=r=>{r=r.trim().replace(/^\|/,'').replace(/\|$/,'');const out=[];let cur='',code=false;
+    for(let i=0;i<r.length;i++){const c=r[i];if(c==='\\'&&r[i+1]==='|'){cur+='|';i++;continue;}if(c==='`')code=!code;if(c==='|'&&!code){out.push(cur.trim());cur='';continue;}cur+=c;}
+    out.push(cur.trim());return out;};
+
+  function blocks(src){
+    const L=src.split('\n'),out=[];let i=0;
+    const interrupts=l=>reFence.test(l)||reHead.test(l)||reHr.test(l)||reQuote.test(l)||reLi.test(l)&&indentOf(l)<4||reHtml.test(l);
+    while(i<L.length){
+      const l=L[i];
+      if(!l.trim()){i++;continue;}
+      let m;
+      if(m=l.match(reFence)){
+        const f=m[1],lang=m[2].trim().split(/\s/)[0];i++;const c=[];
+        while(i<L.length&&!new RegExp('^ {0,3}'+f[0]+'{'+f.length+',}\\s*$').test(L[i])){c.push(L[i]);i++;}i++;
+        out.push(`<pre><code${lang?` class="lang-${esc(lang)}"`:''}>${esc(c.join('\n'))}</code></pre>`);continue;
+      }
+      if(indentOf(l)>=4){const c=[];while(i<L.length&&(indentOf(L[i])>=4||!L[i].trim())){c.push(L[i].slice(4));i++;}
+        while(c.length&&!c[c.length-1].trim())c.pop();out.push(`<pre><code>${esc(c.join('\n'))}</code></pre>`);continue;}
+      if((m=l.match(reHead))&&!reHr.test(l)){
+        const n=m[1].length,txt=inline(m[2]||'');let id=slug(txt);if(slugs[id]!=null)id+='-'+(++slugs[id]);else slugs[id]=0;
+        toc.push({n,id,text:txt.replace(/<[^>]+>/g,'')});out.push(`<h${n} id="${id}">${txt}</h${n}>`);i++;continue;
+      }
+      if(reHr.test(l)){out.push('<hr>');i++;continue;}
+      if(reQuote.test(l)){const q=[];while(i<L.length&&L[i].trim()&&(reQuote.test(L[i])||!interrupts(L[i]))){q.push(L[i].replace(reQuote,''));i++;}
+        out.push('<blockquote>'+blocks(q.join('\n'))+'</blockquote>');continue;}
+      if(reHtml.test(l)){const h=[];while(i<L.length&&L[i].trim()){h.push(L[i]);i++;}out.push(cleanHtml(h.join('\n')));continue;}
+      if(/\|/.test(l)&&i+1<L.length&&reTblSep.test(L[i+1])&&/\|/.test(L[i+1])){
+        const hd=cells(l),al=cells(L[i+1]).map(c=>/^:-+:$/.test(c)?'center':/-+:$/.test(c)?'right':'');
+        const td=(tag,c,k)=>`<${tag}${al[k]?` style="text-align:${al[k]}"`:''}>${inline(c)}</${tag}>`;
+        let h='<div class="tblwrap"><table><thead><tr>'+hd.map((c,k)=>td('th',c,k)).join('')+'</tr></thead><tbody>';i+=2;
+        while(i<L.length&&L[i].trim()&&/\|/.test(L[i])){const r=cells(L[i]);h+='<tr>'+hd.map((_,k)=>td('td',r[k]??'',k)).join('')+'</tr>';i++;}
+        out.push(h+'</tbody></table></div>');continue;
+      }
+      if((reLi.test(l)||reLiEmpty.test(l))&&indentOf(l)<4){
+        const base=indentOf(l),blk=[];
+        while(i<L.length){const x=L[i];
+          if(!x.trim()){let j=i+1;while(j<L.length&&!L[j].trim())j++;
+            if(j<L.length&&(indentOf(L[j])>base||((reLi.test(L[j])||reLiEmpty.test(L[j]))&&indentOf(L[j])>=base))){blk.push('');i++;continue;}break;}
+          if(indentOf(x)<base)break;
+          if(indentOf(x)===base&&!reLi.test(x)&&!reLiEmpty.test(x)&&blk.length&&interrupts(x))break;
+          if(indentOf(x)===base&&!reLi.test(x)&&!reLiEmpty.test(x)&&blk.length&&!blk[blk.length-1])break;
+          blk.push(x);i++;}
+        out.push(list(blk,base));continue;
+      }
+      const p=[];while(i<L.length&&L[i].trim()&&!(p.length&&interrupts(L[i]))){
+        if(i+1<L.length&&/\|/.test(L[i])&&reTblSep.test(L[i+1])&&/\|/.test(L[i+1])&&p.length)break;
+        p.push(L[i].replace(/^ +/,''));i++;}
+      out.push('<p>'+inline(p.join('\n'))+'</p>');
+    }
+    return out.join('\n');
+  }
+
+  function list(lines,base){
+    let html='',open=null,items=[],cur=null;
+    const close=()=>{if(!open)return;html+=`<${open.tag}${open.start&&open.start!==1?` start="${open.start}"`:''}>`+items.map(renderItem).join('')+`</${open.tag}>`;items=[];open=null;};
+    for(const x of lines){
+      const m=x.match(reLi)||x.match(reLiEmpty);
+      if(m&&m[1].length>=base&&m[1].length<base+2){
+        const ord=/\d/.test(m[2]),tag=ord?'ol':'ul';
+        if(open&&open.tag!==tag)close();
+        if(!open)open={tag,start:ord?parseInt(m[2]):null};
+        cur={first:m[3]||'',rest:[],pad:m[1].length+m[2].length+1,loose:false};items.push(cur);
+      }else if(cur){cur.rest.push(x);}
+    }
+    close();return html;
+    function renderItem(it){
+      let t=it.first,cls='',pre='';
+      const tm=t.match(/^\[([ xX])\]\s+(.*)$/)||t.match(/^\[([ xX])\]$/);
+      if(tm){const on=tm[1]!==' ';cls=' class="task'+(on?' done':'')+'"';pre=`<input type="checkbox" data-task="${taskN++}"${on?' checked':''}>`;t=tm[2]||'';}
+      const rest=it.rest.map(r=>r.slice(Math.min(indentOf(r),it.pad))).join('\n').replace(/\n+$/,'');
+      let body='';
+      if(rest.trim()){
+        const firstNested=/^\s*([-*+]|\d+[.)])\s/.test(rest.split('\n').find(s=>s.trim())||'');
+        body=blocks(rest);
+        if(!firstNested&&!/^\s*$/.test(rest.split('\n')[0]))body=body.replace(/^<p>([\s\S]*?)<\/p>/,(_,c)=>'<br>'+c);
+      }
+      return `<li${cls}>${pre}${tm?'<span class="tt">'+inline(t)+'</span>':inline(t)}${body}</li>`;
+    }
+  }
+
+  return{render(src){toc=[];slugs={};taskN=0;const html=blocks(src.replace(/\r\n?/g,'\n').replace(/\t/g,'    '));return{html,toc:toc.slice()};},inline};
+})();
+
+/* ════════════════════════════════════════════════════════════
+   App state and helpers
+   ════════════════════════════════════════════════════════════ */
+const $=id=>document.getElementById(id);
+const src=$('src'),out=$('out'),main=$('main'),editPane=$('editPane'),readPane=$('readPane'),fmtbar=$('fmtbar');
+const KEY='padmd.v1';
+const st={name:'Untitled.md',dirty:false,handle:null,uri:null,view:null,theme:'auto',fs:17,font:'sans',efont:'mono',savedAt:null};
+let lastToc=[];
+
+function loadState(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');Object.assign(st,{theme:s.theme||'auto',fs:s.fs||17,font:s.font||'sans',efont:s.efont||'mono',view:s.view||null,lock:!!s.lock,uri:s.uri||null});
+    if(typeof s.text==='string'){src.value=s.text;st.name=s.name||'Untitled.md';st.dirty=!!s.dirty;return s.text.length>0;}}catch(e){}
+  return false;
+}
+let saveT=null;
+function persist(now){if(now&&richDirty){richDirty=false;src.value=toMd(out);}clearTimeout(saveT);const go=()=>{try{localStorage.setItem(KEY,JSON.stringify({text:src.value,name:st.name,dirty:st.dirty,theme:st.theme,fs:st.fs,font:st.font,efont:st.efont,view:st.view,lock:st.lock,uri:st.uri}));}catch(e){}};now?go():saveT=setTimeout(go,400);}
+
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
+function status(msg,cls){const s=$('status');s.textContent=msg;s.className=cls||'';}
+function setDirty(d){st.dirty=d;$('dirty').classList.toggle('on',d);status(d?'Draft kept on this tablet':'Saved',d?'':'ok');}
+function setName(n){n=(n||'').trim()||'Untitled';if(!/\.(md|markdown|txt)$/i.test(n))n+='.md';st.name=n;$('docName').textContent=n;document.title=n.replace(/\.(md|markdown)$/i,'')+' · padMD';}
+
+/* ── Rendering: Markdown text → formatted page ── */
+let renT=null,richDirty=false,richT=null;
+function counts(){
+  const text=st.view==='wyg'?out.innerText||'':src.value;
+  const words=(text.match(/[A-Za-z0-9À-ɏ'’]+/g)||[]).length;
+  $('wc').textContent=words.toLocaleString('en-NZ')+' word'+(words===1?'':'s');
+  $('rt').textContent=words>200?'· '+Math.ceil(words/220)+' min read':'';
+}
+function markEmpty(){out.classList.toggle('isempty',!out.textContent.trim()&&!out.querySelector('img,hr,table,input,li'));}
+function render(){
+  const text=src.value;
+  out.innerHTML=text.trim()?MD.render(text).html:'<p><br></p>';
+  out.querySelectorAll('input[type=checkbox]').forEach(c=>c.setAttribute('contenteditable','false'));
+  richDirty=false;clearTimeout(richT);markEmpty();counts();
+}
+function queueRender(){clearTimeout(renT);renT=setTimeout(counts,300);}
+/* Formatted page → Markdown text (only after edits in WYG, so untouched files keep their exact text) */
+function flushRich(){clearTimeout(richT);if(!richDirty)return;richDirty=false;src.value=toMd(out);persist();counts();}
+function sync(){if(richDirty)flushRich();}
+function richChanged(){richDirty=true;markEmpty();if(!st.dirty)setDirty(true);clearTimeout(richT);richT=setTimeout(flushRich,400);}
+
+/* ── Modes: WYG (type on the formatted page) and MD (Markdown text) ── */
+function setView(v){
+  if(v!=='md')v='wyg';
+  const was=st.view;
+  if(was==='wyg'&&v==='md')flushRich();
+  st.view=v;persist();
+  editPane.classList.toggle('hide',v!=='md');readPane.classList.toggle('hide',v!=='wyg');
+  main.classList.add('single');
+  if(v==='wyg'){$('findbar').classList.remove('on');if(was!=='wyg')render();}
+  out.contentEditable=st.lock?'false':'true';
+  fmtbar.classList.toggle('hide',v==='wyg'&&st.lock);
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  counts();
+}
+document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{const f=st.view!==b.dataset.view;setView(b.dataset.view);if(f&&!st.lock)(st.view==='md'?src:out).focus({preventScroll:true});});
+
+/* ── Appearance ── */
+function applyLook(){
+  const r=document.documentElement;
+  if(st.theme==='auto')r.removeAttribute('data-theme');else r.dataset.theme=st.theme;
+  r.style.setProperty('--fs',st.fs+'px');
+  document.body.classList.toggle('serif',st.font==='serif');
+  document.body.classList.toggle('sansedit',st.efont==='sans');
+  const dark=st.theme==='dark'||(st.theme==='auto'&&!matchMedia('(prefers-color-scheme: light)').matches);
+  document.querySelector('meta[name=theme-color]').content=dark?'#212426':'#ffffff';
+  const mark=(id,val)=>document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===val));
+  mark('themeSeg',st.theme);mark('lockSeg',st.lock?'on':'off');mark('fontSeg',st.font);mark('efontSeg',st.efont);
+  persist();
+}
+document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick=()=>{st.theme=b.dataset.v;applyLook();});
+document.querySelectorAll('#lockSeg button').forEach(b=>b.onclick=()=>{st.lock=b.dataset.v==='on';applyLook();setView(st.view);toast(st.lock?'WYG is read only. Tap On to type again':'You can type in WYG');});
+document.querySelectorAll('#fontSeg button').forEach(b=>b.onclick=()=>{st.font=b.dataset.v;applyLook();});
+document.querySelectorAll('#efontSeg button').forEach(b=>b.onclick=()=>{st.efont=b.dataset.v;applyLook();});
+$('fsDown').onclick=()=>{st.fs=Math.max(13,st.fs-1);applyLook();toast('Text size '+st.fs);};
+$('fsUp').onclick=()=>{st.fs=Math.min(28,st.fs+1);applyLook();toast('Text size '+st.fs);};
+
+/* ════════════════════════════════════════════════════════════
+   Editing helpers. Changes go through the browser's own text
+   insertion so that Undo and Redo keep working.
+   ════════════════════════════════════════════════════════════ */
+function replaceRange(a,b,text,selA,selB){
+  src.focus();src.setSelectionRange(a,b);
+  const want=src.value.slice(0,a)+text+src.value.slice(b);
+  let ok=false;try{ok=a===b&&!text?true:document.execCommand(text?'insertText':'delete',false,text);}catch(e){}
+  if(!ok||src.value!==want){src.value=want;src.dispatchEvent(new Event('input'));}
+  if(selA==null)selA=a+text.length;
+  src.setSelectionRange(selA,selB??selA);
+}
+function wrap(before,after,ph){
+  const a=src.selectionStart,b=src.selectionEnd,sel=src.value.slice(a,b);
+  if(sel&&sel.startsWith(before)&&sel.endsWith(after)&&sel.length>=before.length+after.length){
+    const inner=sel.slice(before.length,sel.length-after.length);replaceRange(a,b,inner,a,a+inner.length);return;}
+  if(src.value.slice(a-before.length,a)===before&&src.value.slice(b,b+after.length)===after){
+    replaceRange(a-before.length,b+after.length,sel,a-before.length,b-before.length);return;}
+  const t=sel||ph;replaceRange(a,b,before+t+after,a+before.length,a+before.length+t.length);
+}
+function lineBounds(){
+  const v=src.value,a=src.selectionStart,b=src.selectionEnd;
+  const s=v.lastIndexOf('\n',a-1)+1;let e=v.indexOf('\n',b>a&&v[b-1]==='\n'?b-1:b);if(e<0)e=v.length;return[s,e];
+}
+function mapLines(fn){
+  const[s,e]=lineBounds(),lines=src.value.slice(s,e).split('\n');
+  const nl=lines.map(fn).join('\n');replaceRange(s,e,nl,s+(lines.length===1?nl.length:0),s+nl.length);
+  if(lines.length===1)src.setSelectionRange(s+nl.length,s+nl.length);
+}
+const reListPrefix=/^(\s*)([-*+] \[[ xX]\] |[-*+] |\d+[.)] )?/;
+function setHeading(n){mapLines(l=>{const m=l.match(/^(#{1,6})\s+/);const body=l.replace(/^#{1,6}\s+/,'');return m&&m[1].length===n?body:'#'.repeat(n)+' '+body;});}
+function setList(kind){
+  let k=0;
+  mapLines(l=>{const m=l.match(reListPrefix),ind=m[1],cur=m[2]||'',body=l.slice(m[0].length);
+    const isUl=/^[-*+] $/.test(cur),isOl=/^\d/.test(cur),isTask=/\[/.test(cur);
+    if(kind==='ul')return isUl?ind+body:ind+'- '+body;
+    if(kind==='ol')return isOl?ind+body:ind+(++k)+'. '+body;
+    if(kind==='task')return isTask?ind+body:ind+'- [ ] '+body;
+  });
+}
+function prefixLines(p){mapLines(l=>l.startsWith(p)?l.slice(p.length):p+l);}
+function indent(dir){mapLines(l=>dir>0?'  '+l:l.replace(/^ {1,2}|^\t/,''));}
+function insertBlock(text,selOffset,selLen){
+  const a=src.selectionStart,b=src.selectionEnd,v=src.value;
+  const pre=a>0&&v[a-1]!=='\n'?'\n\n':(a>1&&v[a-2]!=='\n'?'\n':'');
+  const post=v[b]&&v[b]!=='\n'?'\n\n':'\n';
+  const s=a+pre.length+(selOffset??text.length);
+  replaceRange(a,b,pre+text+post,s,s+(selLen||0));
+}
+function todayNZ(){return new Date().toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'});}
+
+const actions={
+  undo:()=>{src.focus();document.execCommand('undo');},
+  redo:()=>{src.focus();document.execCommand('redo');},
+  h1:()=>setHeading(1),h2:()=>setHeading(2),h3:()=>setHeading(3),
+  bold:()=>wrap('**','**','bold text'),italic:()=>wrap('*','*','italic text'),
+  strike:()=>wrap('~~','~~','struck text'),mark:()=>wrap('==','==','highlighted text'),
+  code:()=>wrap('`','`','code'),
+  ul:()=>setList('ul'),ol:()=>setList('ol'),task:()=>setList('task'),
+  indent:()=>indent(1),outdent:()=>indent(-1),
+  quote:()=>prefixLines('> '),
+  hr:()=>insertBlock('---'),
+  date:()=>{const d=todayNZ();replaceRange(src.selectionStart,src.selectionEnd,d,src.selectionStart+d.length);},
+  codeblock:()=>{const sel=src.value.slice(src.selectionStart,src.selectionEnd)||'code here';insertBlock('```\n'+sel+'\n```',4,sel.length);},
+  table:()=>insertBlock('| Heading | Heading | Heading |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |',2,7),
+  link:()=>askLink(false),image:()=>askLink(true),
+  find:()=>toggleFind(true)
+};
+fmtbar.addEventListener('pointerdown',e=>{if(e.target.closest('.fb'))e.preventDefault();});  // keep the keyboard open
+fmtbar.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const A=st.view==='wyg'?richActions:actions;if(A[b.dataset.a])A[b.dataset.a]();});
+
+function askLink(img){
+  const a=src.selectionStart,b=src.selectionEnd,sel=src.value.slice(a,b);
+  dialog({title:img?'Insert a picture':'Insert a link',text:img?'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.':'Paste or type the web address.',
+    input:'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
+      if(!url||url==='https://')return;
+      if(img){const alt=sel||'picture';replaceRange(a,b,`![${alt}](${url})`,a+2,a+2+alt.length);}
+      else{const txt=sel||'link text';replaceRange(a,b,`[${txt}](${url})`,a+1,a+1+txt.length);}
+    }}]});
+}
+
+/* ── Smart Enter: carry on lists and checklists, end them on an empty item ── */
+function handleEnter(){
+  const v=src.value,a=src.selectionStart;if(a!==src.selectionEnd)return false;
+  const s=v.lastIndexOf('\n',a-1)+1,line=v.slice(s,a);
+  const m=line.match(/^(\s*)((?:[-*+] \[[ xX]\] )|(?:[-*+] )|(?:(\d+)([.)]) )|(?:> ))(.*)$/);
+  if(!m)return false;
+  const[,ind,mk,num,delim,body]=m;
+  if(!body.trim()){replaceRange(s,a,ind.length>=2?ind.slice(2)+mk.replace(/\d+/,'1'):'',null);return true;}
+  let next=mk;if(num)next=(parseInt(num)+1)+delim+' ';else if(/\[[xX]\]/.test(mk))next=mk.replace(/\[[xX]\]/,'[ ]');
+  replaceRange(a,a,'\n'+ind+next,null);return true;
+}
+src.addEventListener('beforeinput',e=>{
+  if((e.inputType==='insertLineBreak'||e.inputType==='insertParagraph')&&!e.isComposing){if(handleEnter())e.preventDefault();}
+});
+src.addEventListener('keydown',e=>{
+  const mod=e.ctrlKey||e.metaKey;
+  if(e.key==='Tab'){e.preventDefault();const a=src.selectionStart,b=src.selectionEnd;
+    if(a===b&&!e.shiftKey&&!/^\s*([-*+]|\d+[.)])\s/.test(src.value.slice(src.value.lastIndexOf('\n',a-1)+1,a+1)))replaceRange(a,a,'    ',a+4);else indent(e.shiftKey?-1:1);return;}
+  if(!mod)return;
+  const k=e.key.toLowerCase(),map={b:'bold',i:'italic',k:'link',f:'find',h:'find','1':'h1','2':'h2','3':'h3'};
+  if(map[k]&&!e.altKey){e.preventDefault();actions[map[k]]();}
+});
+src.addEventListener('input',()=>{if(!st.dirty)setDirty(true);persist();queueRender();});
+
+/* ════════════════════════════════════════════════════════════
+   WYG mode: typing on the formatted page.
+   The page is turned back into Markdown text after each edit.
+   ════════════════════════════════════════════════════════════ */
+const BLK=/^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|TABLE|HR|SECTION|ARTICLE|FIGURE|DETAILS|DL)$/;
+function escTxt(t){
+  return t.replace(/[\u200b\ufeff]/g,'').replace(/ /g,' ').replace(/([\\`*])/g,'\\$1')
+    .replace(/_/g,(m,i,x)=>/\w/.test(x[i-1]||'')&&/\w/.test(x[i+1]||'')?'_':'\\_')
+    .replace(/~~/g,'\\~\\~').replace(/==/g,'\\=\\=').replace(/\[(?=[^\]]*\]\()/g,'\\[');
+}
+function lineEsc(l){
+  if(/^(#{1,6}(\s|$)|[-+*]\s|>|```|~~~|(-\s*){3,}$)/.test(l))return '\\'+l;
+  return l.replace(/^(\d+)([.)]\s)/,'$1\\$2');
+}
+function isLastContent(n){for(let x=n.nextSibling;x;x=x.nextSibling){if(x.nodeType===1||(x.nodeType===3&&x.nodeValue.trim()))return false;}return true;}
+function inl(n,inTable){
+  let s='';
+  for(const c of n.childNodes){
+    if(c.nodeType===3){s+=escTxt(c.nodeValue.replace(/\s*\n\s*/g,' '));continue;}
+    if(c.nodeType!==1)continue;
+    const t=c.tagName,style=c.getAttribute('style')||'';
+    if(t==='BR'){if(!isLastContent(c))s+=inTable?'<br>':'\\\n';continue;}
+    if(t==='INPUT'||t==='SCRIPT'||t==='STYLE')continue;
+    if(t==='IMG'){s+=`![${(c.getAttribute('alt')||'').replace(/[\[\]]/g,'')}](${(c.getAttribute('src')||'').replace(/ /g,'%20')})`;continue;}
+    if(t==='CODE'){const tx=c.textContent;if(tx){const f=tx.includes('`')?'``':'`';s+=f+(f==='``'?' '+tx+' ':tx)+f;}continue;}
+    const inner=inl(c,inTable);
+    const wrap=m=>{const p=inner.match(/^(\s*)([\s\S]*?)(\s*)$/);return p[2]?p[1]+m+p[2]+m+p[3]:inner;};
+    if(t==='B'||t==='STRONG'||/font-weight:\s*(bold|[6-9]00)/.test(style))s+=wrap('**');
+    else if(t==='I'||t==='EM'||/font-style:\s*italic/.test(style))s+=wrap('*');
+    else if(t==='S'||t==='DEL'||t==='STRIKE')s+=wrap('~~');
+    else if(t==='MARK')s+=wrap('==');
+    else if(t==='A'){const h=c.getAttribute('href')||'';s+=h&&inner.trim()?`[${inner}](${h.replace(/ /g,'%20').replace(/\)/g,'%29')})`:inner;}
+    else if(BLK.test(t)||t==='LI'){s+=(s&&!/\n$/.test(s)?'\\\n':'')+inner;}
+    else s+=inner;
+  }
+  return s;
+}
+function runText(nodes){const span=document.createElement('span');nodes.forEach(n=>span.appendChild(n.cloneNode(true)));
+  return inl(span).replace(/\\\n +/g,'\\\n').trim().split('\n').map(lineEsc).join('\n');}
+function blocks(n){
+  const outB=[];let run=[];
+  const flush=()=>{if(run.length){const t=runText(run);if(t)outB.push(t);}run=[];};
+  for(const c of n.childNodes){
+    if(c.nodeType===1&&BLK.test(c.tagName)){flush();const b=blk(c);if(b)outB.push(b);}
+    else if(c.nodeType===1&&c.tagName==='LI'){flush();const b=list({tagName:'UL',children:[c],getAttribute:()=>null});if(b)outB.push(b);}
+    else run.push(c);
+  }
+  flush();return outB.join('\n\n');
+}
+function blk(c){
+  const t=c.tagName;
+  if(/^H[1-6]$/.test(t)){const x=inl(c).replace(/\\\n/g,' ').trim();return x?'#'.repeat(+t[1])+' '+x:'';}
+  if(t==='HR')return '---';
+  if(t==='PRE'){const code=c.querySelector('code');const lang=((code&&code.className||'').match(/lang-(\S+)/)||[])[1]||'';
+    let tx=(c.innerText||c.textContent).replace(/\n$/,'');const f=tx.includes('```')?'~~~':'```';return tx.trim()||lang?f+lang+'\n'+tx+'\n'+f:'';}
+  if(t==='BLOCKQUOTE'){const x=blocks(c);return x?x.split('\n').map(l=>l?'> '+l:'>').join('\n'):'';}
+  if(t==='UL'||t==='OL')return list(c);
+  if(t==='TABLE')return table(c);
+  return blocks(c);
+}
+function list(el){
+  const ord=el.tagName==='OL';let n=parseInt(el.getAttribute('start')||'1')||1;const lines=[];
+  for(const c of el.children){
+    if(c.tagName==='UL'||c.tagName==='OL'){const sub=list(c);if(sub)lines.push(sub.split('\n').map(l=>l?(ord?'   ':'  ')+l:l).join('\n'));continue;}
+    if(c.tagName!=='LI')continue;
+    const cb=[...c.children].find(x=>x.tagName==='INPUT'&&x.type==='checkbox');
+    const num=ord?(n++)+'. ':'- ',pad=' '.repeat(num.length);
+    const mk=num+(cb?(cb.checked?'[x] ':'[ ] '):'');
+    let first=null;const rest=[];let run=[];
+    const flush=()=>{if(run.length){const t=runText(run);if(t){if(first==null&&!rest.length)first=t;else rest.push(t);}}run=[];};
+    for(const ch of c.childNodes){
+      if(ch.nodeType===1&&(ch.tagName==='UL'||ch.tagName==='OL')){flush();if(first==null)first='';const x=list(ch);if(x)rest.push(x);}
+      else if(ch.nodeType===1&&BLK.test(ch.tagName)){flush();const x=blk(ch);if(x){if(first==null&&!rest.length&&/^(P|DIV)$/.test(ch.tagName))first=x;else rest.push(x);}}
+      else run.push(ch);
+    }
+    flush();
+    let item=mk+(first||'').split('\n').map((l,i)=>i?pad+l:l).join('\n');
+    if(rest.length)item+='\n'+rest.map(r=>r.split('\n').map(l=>l?pad+l:l).join('\n')).join('\n');
+    lines.push(item.replace(/\s+$/,''));
+  }
+  return lines.join('\n');
+}
+function table(el){
+  const rows=[...el.querySelectorAll('tr')];if(!rows.length)return '';
+  const w=Math.max(...rows.map(r=>r.children.length));
+  const cell=c=>c?(inl(c,true).trim().replace(/\|/g,'\\|')||' '):' ';
+  const line=r=>'| '+Array.from({length:w},(_,k)=>cell(r.children[k])).join(' | ')+' |';
+  const al=Array.from({length:w},(_,k)=>{const c=rows[0].children[k];const a=c&&c.style.textAlign;return a==='center'?':---:':a==='right'?'---:':'---';});
+  return [line(rows[0]),'| '+al.join(' | ')+' |',...rows.slice(1).map(line)].join('\n');
+}
+function toMd(root){const md=blocks(root).replace(/\n{3,}/g,'\n\n').trim();return md?md+'\n':'';}
+
+/* ── Helpers for the WYG toolbar ── */
+function selNode(){const s=getSelection();if(!s.rangeCount)return null;const n=s.anchorNode;return out.contains(n)?n:null;}
+function closestTag(re){let n=selNode();while(n&&n!==out){if(n.nodeType===1&&re.test(n.tagName))return n;n=n.parentNode;}return null;}
+function curBlock(){return closestTag(/^(P|DIV|H[1-6]|LI|PRE|BLOCKQUOTE|TD|TH)$/);}
+function ensureFocus(){if(!out.contains(document.activeElement)&&document.activeElement!==out){out.focus();
+  if(!selNode()){const r=document.createRange();r.selectNodeContents(out);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);}}}
+function cmd(c,v){ensureFocus();document.execCommand(c,false,v==null?null:v);}
+function toggleBlock(tag){const b=curBlock();cmd('formatBlock',b&&b.tagName===tag?'<p>':'<'+tag.toLowerCase()+'>');}
+function wrapInline(tag,ph){
+  ensureFocus();const el=closestTag(new RegExp('^'+tag+'$'));
+  if(el){const r=document.createRange();r.selectNode(el);const s=getSelection();s.removeAllRanges();s.addRange(r);cmd('insertHTML',el.innerHTML||'');return;}
+  const s=getSelection();if(!s.rangeCount)return;const r=s.getRangeAt(0);
+  const d=document.createElement('div');d.appendChild(r.cloneContents());
+  cmd('insertHTML',`<${tag.toLowerCase()}>${d.innerHTML||ph}</${tag.toLowerCase()}>&#8203;`);
+}
+function addCheckbox(li,checked){const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('contenteditable','false');cb.checked=!!checked;if(checked)cb.setAttribute('checked','');
+  li.insertBefore(cb,li.firstChild);li.classList.add('task');li.classList.toggle('done',!!checked);
+  if(!li.lastChild||li.lastChild===cb)li.appendChild(document.createElement('br'));
+  const s=getSelection();if(s.rangeCount&&li.contains(s.anchorNode)){const n=s.anchorNode;if(n===li&&s.anchorOffset===0)s.collapse(li,1);}}
+/* Chrome sometimes puts lists inside paragraphs; lift them out and keep the cursor where it was */
+function normalise(){
+  const s=getSelection(),n=s.anchorNode,o=s.anchorOffset;let moved=false;
+  out.querySelectorAll('p,h1,h2,h3,h4,h5,h6').forEach(p=>{if([...p.children].some(c=>/^(UL|OL|P|DIV|BLOCKQUOTE|PRE|TABLE|H[1-6])$/.test(c.tagName))){p.replaceWith(...p.childNodes);moved=true;}});
+  out.querySelectorAll('li').forEach(li=>{const cb=liBox(li);if(cb&&li.firstChild!==cb){const pos=n&&li.contains(n);li.insertBefore(cb,li.firstChild);moved=moved||pos;}});
+  if(moved&&n&&out.contains(n)){try{s.collapse(n,o);}catch(e){}}
+}
+function liBox(li){return li&&[...li.children].find(x=>x.tagName==='INPUT'&&x.type==='checkbox');}
+let savedRange=null;
+function saveRange(){const s=getSelection();savedRange=s.rangeCount&&out.contains(s.anchorNode)?s.getRangeAt(0).cloneRange():null;}
+function restoreRange(){out.focus();if(savedRange){const s=getSelection();s.removeAllRanges();s.addRange(savedRange);}}
+const escA=t=>t.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+const richActions={
+  undo:()=>cmd('undo'),redo:()=>cmd('redo'),
+  h1:()=>toggleBlock('H1'),h2:()=>toggleBlock('H2'),h3:()=>toggleBlock('H3'),
+  bold:()=>cmd('bold'),italic:()=>cmd('italic'),strike:()=>cmd('strikeThrough'),
+  mark:()=>wrapInline('MARK','highlighted text'),code:()=>wrapInline('CODE','code'),
+  ul:()=>{cmd('insertUnorderedList');normalise();},ol:()=>{cmd('insertOrderedList');normalise();},
+  task:()=>{ensureFocus();let li=closestTag(/^LI$/);const box=liBox(li);
+    if(box){box.remove();li.classList.remove('task','done');richChanged();return;}
+    if(!li||li.parentNode.tagName!=='UL'){cmd('insertUnorderedList');normalise();}
+    li=closestTag(/^LI$/);if(li){addCheckbox(li);richChanged();}},
+  indent:()=>closestTag(/^LI$/)?cmd('indent'):toast('Move left and right works on list items'),
+  outdent:()=>closestTag(/^LI$/)?cmd('outdent'):toast('Move left and right works on list items'),
+  quote:()=>{const q=closestTag(/^BLOCKQUOTE$/);
+    if(q){while(q.firstChild)q.parentNode.insertBefore(q.firstChild,q);q.remove();richChanged();}else cmd('formatBlock','<blockquote>');},
+  codeblock:()=>toggleBlock('PRE'),
+  hr:()=>cmd('insertHorizontalRule'),
+  date:()=>cmd('insertText',todayNZ()),
+  table:()=>cmd('insertHTML','<table><thead><tr><th>Heading</th><th>Heading</th><th>Heading</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>'),
+  link:()=>{ensureFocus();saveRange();const a=closestTag(/^A$/);
+    dialog({title:'Insert a link',text:'Paste or type the web address.',input:a?a.getAttribute('href'):'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
+      restoreRange();if(!url||url==='https://')return;
+      if(a){a.setAttribute('href',url);richChanged();return;}
+      const sel=getSelection().toString();
+      if(sel)cmd('createLink',url);else cmd('insertHTML',`<a href="${escA(url)}">${escA(url)}</a>&nbsp;`);}}]}).then(v=>{if(v==null)restoreRange();});},
+  image:()=>{ensureFocus();saveRange();
+    dialog({title:'Insert a picture',text:'Paste the picture’s web address. Pictures on the tablet itself can’t be linked from a Markdown file.',input:'https://',buttons:[{label:'Cancel'},{label:'Insert',primary:true,run:url=>{
+      restoreRange();if(!url||url==='https://')return;cmd('insertHTML',`<img src="${escA(url)}" alt="picture">`);}}]}).then(v=>{if(v==null)restoreRange();});},
+  find:()=>{setView('md');toggleFind(true);}
+};
+
+/* Typing shortcuts: "# " heading, "- " bullet, "1. " numbers, "[] " tick box, "> " quote, "``` " code */
+function autoFormat(){
+  let b=curBlock();const s=getSelection();
+  if(!b&&s.anchorNode&&out.contains(s.anchorNode)){cmd('formatBlock','<p>');b=curBlock();}
+  if(!b||!/^(P|DIV|LI)$/.test(b.tagName))return;if(!s.isCollapsed)return;
+  const r=document.createRange();r.setStart(b,0);r.setEnd(s.anchorNode,s.anchorOffset);
+  const t=r.toString().replace(/ /g,' ');
+  if(b.tagName==='LI'){if(/^\[ ?\] $/.test(t)&&!liBox(b)){s.removeAllRanges();s.addRange(r);document.execCommand('delete');addCheckbox(b);richChanged();}return;}
+  const m=t.match(/^(#{1,6}|[-*+]|1[.)]|>|\[ ?\]|```) $/);if(!m)return;
+  s.removeAllRanges();s.addRange(r);document.execCommand('delete');
+  const k=m[1];
+  if(k[0]==='#')cmd('formatBlock','<h'+k.length+'>');
+  else if(/^[-*+]$/.test(k)){cmd('insertUnorderedList');normalise();}
+  else if(/^1/.test(k)){cmd('insertOrderedList');normalise();}
+  else if(k==='>')cmd('formatBlock','<blockquote>');
+  else if(k==='```')cmd('formatBlock','<pre>');
+  else richActions.task();
+}
+out.addEventListener('beforeinput',e=>{
+  if(e.inputType!=='insertParagraph'&&e.inputType!=='insertLineBreak')return;
+  const li=closestTag(/^LI$/);
+  if(!li){const q=closestTag(/^BLOCKQUOTE$/),b=curBlock();
+    if(q&&b&&!b.textContent.trim()){e.preventDefault();cmd('formatBlock','<p>');richChanged();}return;}
+  if(li.textContent.trim()||li.querySelector('img'))return;
+  e.preventDefault();cmd('outdent');normalise();
+  const li2=closestTag(/^LI$/);if(li2&&li2!==li&&!liBox(li2.previousElementSibling))liBox(li2)?.remove();
+  if(!closestTag(/^LI$/)){const b=curBlock();if(!b||b.tagName==='DIV')cmd('formatBlock','<p>');}
+  out.querySelectorAll('input[type=checkbox]').forEach(cb=>{if(!cb.closest('li'))cb.remove();});
+  richChanged();
+});
+out.addEventListener('input',e=>{
+  normalise();
+  if(e.inputType==='insertText'&&e.data===' ')autoFormat();
+  if(e.inputType==='insertParagraph'||e.inputType==='insertLineBreak'){
+    const li=closestTag(/^LI$/),prev=li&&li.previousElementSibling;
+    if(li&&liBox(prev)){const box=liBox(li);if(!box)addCheckbox(li);else if(box.checked&&!li.textContent.trim()){box.checked=false;box.removeAttribute('checked');li.classList.remove('done');}}
+    if(li&&!liBox(prev)&&liBox(li)&&prev)liBox(li).remove();
+  }
+  out.querySelectorAll('li.task').forEach(li=>{if(!liBox(li))li.classList.remove('task','done');});
+  richChanged();
+});
+out.addEventListener('change',e=>{const cb=e.target;if(!(cb.tagName==='INPUT'&&cb.type==='checkbox'))return;
+  cb.toggleAttribute('checked',cb.checked);const li=cb.closest('li');if(li)li.classList.toggle('done',cb.checked);richChanged();flushRich();});
+out.addEventListener('paste',e=>{
+  const cd=e.clipboardData;if(!cd)return;const html=cd.getData('text/html'),txt=cd.getData('text/plain');
+  e.preventDefault();
+  if(html){const d=document.createElement('div');d.innerHTML=html;cmd('insertHTML',MD.render(toMd(d)).html);}
+  else if(txt&&/\n/.test(txt))cmd('insertHTML',MD.render(txt).html);
+  else if(txt)cmd('insertText',txt);
+});
+out.addEventListener('keydown',e=>{
+  const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
+  if(e.key==='Tab'&&closestTag(/^LI$/)){e.preventDefault();cmd(e.shiftKey?'outdent':'indent');return;}
+  if(!mod||e.altKey)return;
+  const map={k:'link',f:'find',h:'find','1':'h1','2':'h2','3':'h3'};
+  if(map[k]){e.preventDefault();richActions[map[k]]();}
+});
+out.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;
+  if(out.isContentEditable&&!e.ctrlKey){e.preventDefault();return;}
+  const h=a.getAttribute('href')||'';if(h.startsWith('#')){e.preventDefault();document.getElementById(decodeURIComponent(h.slice(1)))?.scrollIntoView({behavior:'smooth'});}});
+readPane.addEventListener('click',e=>{if(e.target!==readPane||!out.isContentEditable)return;
+  out.focus();const r=document.createRange();r.selectNodeContents(out.lastElementChild||out);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);});
+
+/* ════════════════════════════════════════════════════════════
+   Find and replace
+   ════════════════════════════════════════════════════════════ */
+let hits=[],hitI=-1;
+function toggleFind(on){const fb=$('findbar');fb.classList.toggle('on',on);if(on){if(st.view!=='md')setView('md');
+  const sel=src.value.slice(src.selectionStart,src.selectionEnd);if(sel&&!sel.includes('\n'))$('findIn').value=sel;$('findIn').focus();$('findIn').select();doFind();}}
+function doFind(){const q=$('findIn').value;hits=[];if(q){const v=src.value.toLowerCase(),ql=q.toLowerCase();let p=0;while((p=v.indexOf(ql,p))>=0){hits.push(p);p+=ql.length||1;}}
+  const cur=src.selectionStart;hitI=hits.findIndex(h=>h>=cur);if(hitI<0&&hits.length)hitI=0;showCount();}
+function showCount(){$('findCnt').textContent=$('findIn').value?(hits.length?(hitI+1)+' of '+hits.length:'None'):'';}
+function goHit(d){if(!hits.length)return;hitI=(hitI+d+hits.length)%hits.length;const p=hits[hitI],q=$('findIn').value.length;
+  src.focus();src.setSelectionRange(p,p+q);const before=src.value.slice(0,p).split('\n').length;
+  const lh=parseFloat(getComputedStyle(src).lineHeight)||26;src.scrollTop=Math.max(0,before*lh-src.clientHeight/3);showCount();}
+$('findIn').addEventListener('input',doFind);
+$('findIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();goHit(e.shiftKey?-1:1);}if(e.key==='Escape')toggleFind(false);});
+$('findNext').onclick=()=>goHit(1);$('findPrev').onclick=()=>goHit(-1);
+$('replOne').onclick=()=>{const q=$('findIn').value;if(!q||!hits.length)return;const p=hits[hitI<0?0:hitI];
+  replaceRange(p,p+q.length,$('replIn').value);doFind();hitI=hits.findIndex(h=>h>=p);if(hitI<0)hitI=0;if(hits.length)goHit(0);else showCount();};
+$('replAll').onclick=()=>{const q=$('findIn').value;if(!q||!hits.length)return;const n=hits.length;
+  const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');const nv=src.value.replace(re,()=>$('replIn').value);
+  replaceRange(0,src.value.length,nv,0);doFind();toast(n+' replaced');};
+$('findClose').onclick=()=>toggleFind(false);
+
+/* ════════════════════════════════════════════════════════════
+   Files: open, save, share
+   ════════════════════════════════════════════════════════════ */
+const hasPicker='showSaveFilePicker' in window&&'showOpenFilePicker' in window;
+/* ── Android app bridge (only present when padMD runs as the Android app) ── */
+const AND=window.Android||null;
+if(AND)document.documentElement.classList.add('app');
+window.padLoad=(t,name,uri,writable)=>{(async()=>{
+  if(st.dirty&&src.value.trim()&&src.value!==t&&!(await confirmDiscard()))return;
+  loadText(t,name||'Untitled.md',null);st.uri=writable?uri:null;persist(true);})();};
+window.padSaved=(uri,name)=>{st.uri=uri;setName(name);setDirty(false);persist(true);toast('Saved '+st.name);};
+window.padToast=m=>toast(m);
+window.padBack=()=>{if(document.querySelector('.sheet.on')){if(dlgCancel)dlgCancel();closeSheets();return true;}
+  if($('findbar').classList.contains('on')){toggleFind(false);return true;}persist(true);return false;};
+async function openFile(){sync();
+  if(AND){if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;AND.openFile();return;}
+  if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;
+  if(hasPicker){try{const[h]=await showOpenFilePicker({types:[{description:'Markdown',accept:{'text/markdown':['.md','.markdown','.txt']}}]});
+      const f=await h.getFile();loadText(await f.text(),f.name,h);}catch(e){if(e.name!=='AbortError')toast('Could not open that file');}return;}
+  $('fileIn').value='';$('fileIn').click();
+}
+$('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  if(f.size>8e6){toast('That file is too big to edit here');return;}
+  const t=await f.text();if(/\u0000/.test(t.slice(0,2000))){toast('That doesn’t look like a text file');return;}
+  loadText(t,f.name,null);};
+function loadText(t,name,handle){richDirty=false;st.uri=null;
+  src.value=t.replace(/\r\n?/g,'\n');setName(name);st.handle=handle;setDirty(false);persist(true);render();
+  src.setSelectionRange(0,0);src.scrollTop=0;readPane.scrollTop=0;
+  toast('Opened '+st.name);
+}
+function blob(){return new Blob([src.value],{type:'text/markdown;charset=utf-8'});}
+function download(b,name){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);}
+async function save(asNew){sync();
+  if(AND){if(st.uri&&!asNew)AND.saveTo(st.uri,src.value,st.name);else{if(asNew){const n=await askName('Save as','Choose where to save it on the next screen.');if(n==null)return;setName(n);}AND.saveAs(st.name,src.value,'text/markdown',true);}return;}
+  if(hasPicker){try{
+      if(!st.handle||asNew)st.handle=await showSaveFilePicker({suggestedName:st.name,types:[{description:'Markdown',accept:{'text/markdown':['.md']}}]});
+      const w=await st.handle.createWritable();await w.write(blob());await w.close();setName(st.handle.name);setDirty(false);persist(true);toast('Saved '+st.name);return;
+    }catch(e){if(e.name==='AbortError')return;st.handle=null;}}
+  if(asNew||st.name==='Untitled.md'){const n=await askName('Save as','The file goes to your Downloads folder. Use Share to send it to OneDrive, Google Drive or another app.');if(n==null)return;setName(n);}
+  download(blob(),st.name);setDirty(false);persist(true);toast('Saved to Downloads as '+st.name);
+}
+async function share(){sync();
+  if(AND){AND.share(st.name,src.value);return;}
+  const file=new File([src.value],st.name,{type:'text/plain'});
+  try{
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:st.name});return;}
+    if(navigator.share){await navigator.share({title:st.name,text:src.value});return;}
+  }catch(e){if(e.name==='AbortError')return;}
+  await navigator.clipboard?.writeText(src.value);toast('Sharing isn’t available here, so the text was copied instead');
+}
+function exportHtml(){sync();
+  const r=MD.render(src.value),title=st.name.replace(/\.(md|markdown|txt)$/i,'');
+  const css=[...document.styleSheets[0].cssRules].map(x=>x.cssText).filter(t=>/^(:root|\.md|@page|@media \(prefers)/.test(t)).join('\n');
+  const html=`<!DOCTYPE html><html lang="en-NZ"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/</g,'&lt;')}</title><style>${css}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}.md{padding:28px 24px 60px}</style></head><body><article class="md">${r.html}</article></body></html>`;
+  if(AND){AND.saveAs(title+'.html',html,'text/html',false);return;}
+  download(new Blob([html],{type:'text/html;charset=utf-8'}),title+'.html');toast('Downloaded '+title+'.html');
+}
+function newDoc(){(async()=>{if(st.dirty&&src.value.trim()&&!(await confirmDiscard()))return;
+  src.value='';setName('Untitled.md');st.handle=null;st.uri=null;setDirty(false);persist(true);render();if(!st.lock)(st.view==='md'?src:out).focus();toast('New document ready, start typing');})();}
+$('openBtn').onclick=openFile;$('saveBtn').onclick=()=>save(false);$('shareBtn').onclick=share;
+$('nameBtn').onclick=async()=>{const n=await askName('Rename','This changes the name used next time you save.');if(n!=null){setName(n);persist();}};
+document.addEventListener('keydown',e=>{const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
+  if(mod&&k==='s'){e.preventDefault();save(e.shiftKey);}else if(mod&&k==='o'){e.preventDefault();openFile();}
+  else if(mod&&k==='p'){e.preventDefault();doPrint();}else if(e.key==='Escape'){closeSheets();}});
+window.addEventListener('beforeunload',()=>persist(true));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)persist(true);});
+
+function doPrint(){sync();const v=st.view;if(v==='md'){render();readPane.classList.remove('hide');}setTimeout(()=>{if(AND)AND.print(st.name.replace(/\.(md|markdown|txt)$/i,''));else window.print();if(v==='md')readPane.classList.add('hide');},50);}
+
+/* ════════════════════════════════════════════════════════════
+   Menus, contents list and small dialogs
+   ════════════════════════════════════════════════════════════ */
+function closeSheets(){document.querySelectorAll('.sheet.on').forEach(s=>s.classList.remove('on'));$('scrim').classList.remove('on');$('menuBtn').classList.remove('on');$('tocBtn').classList.remove('on');}
+function openSheet(id){closeSheets();$(id).classList.add('on');$('scrim').classList.add('on');}
+$('scrim').onclick=()=>{if(dlgCancel)dlgCancel();closeSheets();};
+$('menuBtn').onclick=()=>{const on=$('menu').classList.contains('on');closeSheets();if(!on){openSheet('menu');$('menuBtn').classList.add('on');}};
+$('menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;closeSheets();
+  ({new:newDoc,saveas:()=>save(true),copy:async()=>{sync();try{await navigator.clipboard.writeText(src.value);toast('Markdown copied');}catch(_){src.select();document.execCommand('copy');toast('Markdown copied');}},
+    copyhtml:exportHtml,print:doPrint,help:showHelp})[b.dataset.m]();});
+$('tocBtn').onclick=()=>{
+  if($('toc').classList.contains('on')){closeSheets();return;}
+  if(st.view==='md')render();const t=$('toc'),hs=[...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h=>h.textContent.trim());
+  t.innerHTML=hs.length?hs.map((h,i)=>`<a href="#" data-i="${i}" class="l${h.tagName[1]}">${h.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</a>`).join(''):'<div class="none">No headings yet. Lines starting with # become headings and show up here.</div>';
+  openSheet('toc');$('tocBtn').classList.add('on');
+};
+$('toc').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();closeSheets();
+  setView('wyg');[...out.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h=>h.textContent.trim())[+a.dataset.i]?.scrollIntoView({behavior:'smooth',block:'start'});});
+out.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a)return;e.preventDefault();document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)))?.scrollIntoView({behavior:'smooth'});});
+
+let dlgCancel=null;
+function dialog({title,text,input,buttons}){
+  return new Promise(res=>{
+    $('dlgTitle').textContent=title;$('dlgText').textContent=text||'';const inp=$('dlgIn');inp.hidden=input==null;if(input!=null)inp.value=input;
+    const row=$('dlgBtns');row.innerHTML='';
+    const finish=(b)=>{closeSheets();dlgCancel=null;const val=input!=null?inp.value.trim():null;if(b&&b.run)b.run(val);res(b?b.value??(input!=null?val:true):null);};
+    buttons.forEach(b=>{const el=document.createElement('button');el.className=b.primary?'btnp':'btns';el.textContent=b.label;el.onclick=()=>finish(b.label==='Cancel'?null:b);row.appendChild(el);});
+    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(buttons.find(b=>b.primary));}};
+    dlgCancel=()=>{dlgCancel=null;res(null);};
+    openSheet('dlg');if(input!=null)setTimeout(()=>{inp.focus();inp.select();},60);
+  });
+}
+const askName=(t,txt)=>dialog({title:t,text:txt,input:st.name,buttons:[{label:'Cancel'},{label:'OK',primary:true}]}).then(v=>v==null||v===''?null:v);
+const confirmDiscard=()=>dialog({title:'Replace this document?',text:'“'+st.name+'” has changes that haven’t been saved to a file. Save first if you want to keep them.',
+  buttons:[{label:'Cancel'},{label:'Replace it',primary:true,value:true}]}).then(v=>!!v);
+
+const HELP=`# Markdown cheat sheet
+
+Markdown is plain text with a few symbols that turn into formatting. **WYG** shows the formatted page and you can type straight onto it. **MD** shows the plain Markdown text. The buttons work in both.
+
+| You type | You get |
+| --- | --- |
+| \`# Heading\` | Big heading (\`##\` and \`###\` for smaller ones) |
+| \`**bold**\` | **bold** |
+| \`*italic*\` | *italic* |
+| \`~~struck~~\` | ~~struck~~ |
+| \`==highlight==\` | ==highlight== |
+| \`- item\` | Bullet list |
+| \`1. item\` | Numbered list |
+| \`- [ ] task\` | Tick box (tap it in WYG) |
+| \`> quote\` | Indented quote |
+| \`[words](https://…)\` | A link |
+| \`---\` | Dividing line |
+
+**Tips**
+
+- In WYG you can type the symbols too: # and a space makes a heading, - and a space starts a list, 1. and a space a numbered list, [] and a space a tick box, > and a space a quote.
+- Press Enter at the end of a list item and the next bullet or number is added for you. Press Enter on an empty item to finish the list.
+- Two spaces at the end of a line start a new line without a gap.
+- With a keyboard cover: Ctrl+B bold, Ctrl+I italic, Ctrl+K link, Ctrl+S save, Ctrl+F find, Tab and Shift+Tab move list items in and out.
+- Reading a long file? In the ⋮ menu set **WYG typing** to *Read only* so the keyboard stays out of the way.
+- Your work is kept on this tablet as you type, even if you close the page. Use **Save** or **Share** to keep a real file.
+- In the padMD app, **Save** writes straight back to the file you opened, and **Save as** lets you pick a folder. In a web browser, **Save** puts the file in Downloads instead.
+- **Share** sends the text straight to OneDrive, Google Drive, email or another app.
+- **Print** (in the ⋮ menu) makes an A4 page, and you can choose *Save as PDF* there.`;
+function showHelp(){$('helpBody').innerHTML=MD.render(HELP).html;openSheet('help');}
+$('helpClose').onclick=closeSheets;
+
+/* ════════════════════════════════════════════════════════════
+   Start up
+   ════════════════════════════════════════════════════════════ */
+const had=loadState();
+setName(st.name);setDirty(st.dirty);if(!st.dirty)status(had?'Ready':'Ready');
+applyLook();
+try{document.execCommand('defaultParagraphSeparator',false,'p');}catch(e){}
+st.view=st.view==='md'?'md':'wyg';const startView=st.view;st.view=null;setView(startView);render();
+if(had&&st.dirty)status('Unsaved draft brought back','warn');
+</script>
+</body>
+</html>

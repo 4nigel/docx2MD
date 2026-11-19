@@ -1,0 +1,75 @@
+name: Build padMD Android app
+
+on:
+  push:
+    branches: [padmd-android, main]
+    paths: ['padmd-android/**', '.github/workflows/padmd-android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # Keep the same signing key between builds so new versions install over old ones.
+      # A repository secret (PADMD_KEYSTORE_B64 + PADMD_KEYSTORE_PASSWORD) wins if set;
+      # otherwise a key is made once and kept in the Actions cache.
+      - name: Restore signing key
+        id: keycache
+        uses: actions/cache@v4
+        with:
+          path: ~/.padmd/padmd.jks
+          key: padmd-signing-key-v1
+
+      - name: Prepare signing key
+        env:
+          KS_B64: ${{ secrets.PADMD_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.PADMD_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p ~/.padmd
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > ~/.padmd/padmd.jks
+            echo "PADMD_KEYSTORE_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
+          else
+            if [ ! -f ~/.padmd/padmd.jks ]; then
+              keytool -genkeypair -v -keystore ~/.padmd/padmd.jks -alias padmd -keyalg RSA -keysize 2048 \
+                -validity 10000 -storepass padmdcache -keypass padmdcache -dname "CN=padMD, C=NZ"
+            fi
+            echo "PADMD_KEYSTORE_PASSWORD=padmdcache" >> "$GITHUB_ENV"
+          fi
+          echo "PADMD_KEYSTORE=$HOME/.padmd/padmd.jks" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle -p padmd-android assembleRelease --no-daemon
+
+      - name: Publish to the padMD release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp padmd-android/app/build/outputs/apk/release/app-release.apk padMD.apk
+          if ! gh release view padmd-latest >/dev/null 2>&1; then
+            gh release create padmd-latest --target "$GITHUB_SHA" --title "padMD Android app" \
+              --notes "Download padMD.apk on your tablet and open it to install. Built automatically from the padmd-android folder." --prerelease
+          fi
+          gh release upload padmd-latest padMD.apk --clobber
+          gh release edit padmd-latest --notes "Download padMD.apk on your tablet and open it to install. Version 1.0.${{ github.run_number }}, built $(date -u +%Y-%m-%d)."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: padMD-apk
+          path: padMD.apk
